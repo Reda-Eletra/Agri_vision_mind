@@ -1,0 +1,43 @@
+{
+  "name": "copy-of-بعد-التعديلات",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:frontend": "vitest run",
+    "test:backend": "npm --prefix \"./back_end SmartAgri_project/back_end SmartAgri_project\" test",
+    "test:all": "npm run test:frontend && npm run test:backend",
+    "backend:install": "npm --prefix \"./back_end SmartAgri_project/back_end SmartAgri_project\" install",
+    "backend:dev": "npm --prefix \"./back_end SmartAgri_project/back_end SmartAgri_project\" run dev",
+    "backend:start": "npm --prefix \"./back_end SmartAgri_project/back_end SmartAgri_project\" run start"
+  },
+  "dependencies": {
+    "@google/genai": "^1.52.0",
+    "country-state-city": "^3.2.1",
+    "framer-motion": "^12.23.25",
+    "lucide-react": "^0.556.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "@protobufjs/utf8": "1.1.1",
+    "brace-expansion": "2.1.1",
+    "protobufjs": "7.6.2",
+    "ws": "8.21.0"
+  }
+}

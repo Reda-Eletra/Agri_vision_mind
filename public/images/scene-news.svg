@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#93C5FD"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  <rect x="160" y="110" width="880" height="480" rx="24" fill="#FFFFFF" fill-opacity="0.85" stroke="#60A5FA"/>
+  <rect x="230" y="190" width="520" height="34" rx="10" fill="#1D4ED8"/>
+  <rect x="230" y="250" width="720" height="20" rx="8" fill="#BFDBFE"/>
+  <rect x="230" y="290" width="640" height="20" rx="8" fill="#BFDBFE"/>
+  <rect x="230" y="330" width="680" height="20" rx="8" fill="#BFDBFE"/>
+  <rect x="230" y="390" width="220" height="130" rx="14" fill="#DBEAFE"/>
+  <rect x="490" y="390" width="220" height="130" rx="14" fill="#DBEAFE"/>
+  <rect x="750" y="390" width="220" height="130" rx="14" fill="#DBEAFE"/>
+  <text x="230" y="177" fill="#0F172A" font-family="Arial, sans-serif" font-size="34" font-weight="700">Agricultural News</text>
+</svg>
+

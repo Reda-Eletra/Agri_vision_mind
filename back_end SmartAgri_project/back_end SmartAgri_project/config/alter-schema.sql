@@ -1,0 +1,3 @@
+-- Deprecated.
+-- Schema upgrades are owned by the ordered files in ../migrations.
+-- Run `npm run db:migrate` instead of executing this file.

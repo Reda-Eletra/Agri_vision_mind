@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 500">
+  <rect width="700" height="500" fill="#ECFDF5"/>
+  <rect x="160" y="80" width="380" height="340" rx="22" fill="#D1FAE5" stroke="#34D399"/>
+  <path d="M350 330 V200" stroke="#059669" stroke-width="16" stroke-linecap="round"/>
+  <path d="M285 245 L350 180 L415 245" fill="none" stroke="#059669" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="230" y="350" width="240" height="30" rx="10" fill="#10B981"/>
+  <text x="190" y="55" fill="#065F46" font-family="Arial, sans-serif" font-size="38" font-weight="700">Step 1 - Upload</text>
+</svg>
+

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#86EFAC"/>
+      <stop offset="100%" stop-color="#0EA5A4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#sky)"/>
+  <circle cx="980" cy="120" r="70" fill="#FDE68A"/>
+  <path d="M0 500 C220 430 420 560 620 500 C840 430 980 560 1200 500 V700 H0 Z" fill="#16A34A"/>
+  <path d="M0 560 C220 500 420 620 620 560 C840 500 980 620 1200 560 V700 H0 Z" fill="#15803D" fill-opacity="0.85"/>
+  <path d="M190 510 Q235 455 280 510" stroke="#BBF7D0" stroke-width="8" fill="none"/>
+  <path d="M560 540 Q610 470 660 540" stroke="#BBF7D0" stroke-width="8" fill="none"/>
+  <path d="M860 520 Q900 470 940 520" stroke="#BBF7D0" stroke-width="8" fill="none"/>
+  <rect x="80" y="40" width="300" height="60" rx="12" fill="#064E3B" fill-opacity="0.55"/>
+  <text x="105" y="79" fill="#ECFDF5" font-family="Arial, sans-serif" font-size="30" font-weight="700">Agricultural Vision</text>
+</svg>
+

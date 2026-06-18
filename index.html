@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agricultural Vision Mind</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Noto+Kufi+Arabic:wght@500;700&family=Noto+Sans+Arabic:wght@400;500;600;700;800&family=Tajawal:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // Enable dark mode
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'sans-serif'],
+            },
+            colors: {
+              'brand-green': '#166534',
+              'brand-green-light': '#dcfce7',
+              'brand-green-dark': '#14532d',
+              'brand-green-darker': '#0f1712',
+              'brand-bg-light': '#f8faf7',
+              'brand-bg-dark': '#0f1712',
+              'brand-sage': '#526157',
+              'brand-ivory': '#ffffff',
+              'brand-blue': '#2563eb',
+              'brand-amber': '#d97706',
+              'brand-danger': '#dc2626',
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'slide-in-up': 'slideInUp 0.3s ease-out forwards',
+              'highlight-update': 'highlightUpdate 1.5s ease-out',
+              'float': 'float 6s ease-in-out infinite',
+              'hero-reveal': 'heroReveal 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'fade-up-stagger': 'fadeUpStagger 0.8s ease-out forwards',
+              'pulse-soft': 'pulseSoft 3s infinite',
+              'soft-glow': 'softGlow 2.5s infinite alternate',
+              'leaf-spinner': 'leafSpinner 1.2s linear infinite',
+              'rise-soft': 'riseSoft 0.55s cubic-bezier(0.2, 0.9, 0.2, 1) forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              slideInUp: {
+                '0%': { opacity: '0', transform: 'translateY(50px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              highlightUpdate: {
+                '0%': { boxShadow: '0 0 0 0px rgba(60, 179, 113, 0.7)' },
+                '50%': { boxShadow: '0 0 0 8px rgba(60, 179, 113, 0)' },
+                '100%': { boxShadow: '0 0 0 0px rgba(60, 179, 113, 0)' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-20px)' },
+              },
+              heroReveal: {
+                '0%': { opacity: '0', transform: 'scale(1.15) translateY(20px)' },
+                '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+              },
+              fadeUpStagger: {
+                '0%': { opacity: '0', transform: 'translateY(30px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              pulseSoft: {
+                '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+                '50%': { opacity: '0.9', transform: 'scale(1.02)' },
+              },
+              softGlow: {
+                'from': { boxShadow: '0 0 0 4px rgba(22, 101, 52, 0.10)' },
+                'to': { boxShadow: '0 0 0 6px rgba(22, 101, 52, 0.08)' },
+              },
+              leafSpinner: {
+                  '0%': { transform: 'rotate(0deg) scale(1)' },
+                  '50%': { transform: 'rotate(180deg) scale(0.8)' },
+                  '100%': { transform: 'rotate(360deg) scale(1)' },
+              },
+              riseSoft: {
+                  '0%': { opacity: '0', transform: 'translateY(18px)' },
+                  '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+            },
+            backdropBlur: {
+              xs: '2px',
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+      /* --- ENHANCED BACKGROUND --- */
+      body {
+        position: relative;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-image: 
+            radial-gradient(circle at 14% 18%, rgba(22, 101, 52, 0.06), transparent 32%),
+            radial-gradient(circle at 86% 10%, rgba(15, 118, 110, 0.05), transparent 22%);
+        will-change: transform;
+        animation: none;
+        z-index: -1;
+        pointer-events: none;
+      }
+      .dark body::before {
+        background-image: 
+            radial-gradient(circle at 14% 18%, rgba(74, 222, 128, 0.08), transparent 34%),
+            radial-gradient(circle at 86% 10%, rgba(45, 212, 191, 0.06), transparent 24%);
+      }
+      @keyframes background-move {
+        0% { transform: translate(0%, 0%) scale(1); }
+        100% { transform: translate(10%, 5%) scale(1.2); }
+      }
+
+      /* 3D Image Effects */
+      .perspective-container {
+        perspective: 1500px;
+      }
+      
+      .image-3d-effect {
+        transform: rotateY(-3deg) rotateX(2deg);
+        box-shadow: 0 12px 28px rgba(15, 23, 18, 0.08);
+        transition: transform 0.5s ease, box-shadow 0.5s ease;
+        border-radius: 1.5rem;
+      }
+
+      .image-3d-effect:hover {
+        transform: rotateY(0deg) rotateX(0deg) translateY(-4px);
+        box-shadow: 0 16px 34px rgba(15, 23, 18, 0.10);
+      }
+
+      /* RTL Support for 3D */
+      html[dir="rtl"] .image-3d-effect {
+        transform: rotateY(5deg) rotateX(5deg);
+      }
+      html[dir="rtl"] .image-3d-effect:hover {
+        transform: rotateY(0deg) rotateX(0deg) scale(1.02);
+      }
+      
+      /* Floating items */
+      .float-animation {
+        animation: float 6s ease-in-out infinite;
+      }
+
+      /* Animation Delays for Staggering */
+      .delay-100 { animation-delay: 100ms; }
+      .delay-200 { animation-delay: 200ms; }
+      .delay-300 { animation-delay: 300ms; }
+      .delay-400 { animation-delay: 400ms; }
+      .delay-500 { animation-delay: 500ms; }
+      .delay-600 { animation-delay: 600ms; }
+      .delay-700 { animation-delay: 700ms; }
+      .delay-800 { animation-delay: 800ms; }
+      .delay-900 { animation-delay: 900ms; }
+      .delay-1000 { animation-delay: 1000ms; }
+      
+      /* Fill mode for staggered animations so they stay visible after finishing */
+      .fill-forwards {
+        animation-fill-mode: forwards;
+      }
+      
+      .opacity-0-start {
+        opacity: 0;
+      }
+
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .scrollbar-hide {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.25",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-brand-bg-light dark:bg-brand-bg-dark transition-colors duration-300 font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

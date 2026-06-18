@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 500">
+  <rect width="700" height="500" fill="#DCFCE7"/>
+  <rect x="240" y="110" width="220" height="310" rx="26" fill="#14532D"/>
+  <rect x="280" y="160" width="140" height="140" rx="18" fill="#4ADE80"/>
+  <rect x="290" y="340" width="120" height="36" rx="10" fill="#A7F3D0"/>
+  <text x="220" y="80" fill="#166534" font-family="Arial, sans-serif" font-size="44" font-weight="700">Agri Product</text>
+</svg>
+

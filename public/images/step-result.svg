@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 500">
+  <rect width="700" height="500" fill="#F0FDF4"/>
+  <rect x="130" y="90" width="440" height="320" rx="22" fill="#FFFFFF" stroke="#86EFAC"/>
+  <circle cx="250" cy="220" r="46" fill="#22C55E" fill-opacity="0.25"/>
+  <path d="M225 220 L245 242 L284 200" stroke="#16A34A" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="330" y="180" width="180" height="24" rx="8" fill="#22C55E" fill-opacity="0.7"/>
+  <rect x="330" y="220" width="150" height="18" rx="7" fill="#86EFAC"/>
+  <rect x="330" y="252" width="120" height="18" rx="7" fill="#86EFAC"/>
+  <text x="150" y="60" fill="#14532D" font-family="Arial, sans-serif" font-size="38" font-weight="700">Step 3 - Result</text>
+</svg>
