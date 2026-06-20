@@ -9,7 +9,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from '../contexts/LanguageContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { generateDiagnosisPdf } from '../services/pdfService';
-import { PageHeader } from './PageHeader';
 import { RealTimeMonitor } from './RealTimeMonitor';
 import { cycleApi, cyclePlantApi, cycleTaskApi } from '../services/apiService';
 
@@ -364,13 +363,7 @@ export const PlantDoctor: React.FC<PlantDoctorProps> = ({ onTrackPlantSuccess })
   
   return (
     <div className="animate-fade-in pb-12">
-        <PageHeader
-            title={t('plantDoctor.pageTitle')}
-            subtitle={t('plantDoctor.pageSubtitle')}
-            imageUrl="/images/avm-3d/plant-doctor-upload.png"
-        />
-        
-        <div className="mt-[-4rem] relative z-10 px-4">
+        <div className="relative z-10 px-4 pt-8">
             
             {/* --- Visual Steps Section --- */}
             <div className="max-w-5xl mx-auto mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">

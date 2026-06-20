@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Heart, ImagePlus, MessageSquareText, Plus, Search, Send, ShieldCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from '../contexts/LanguageContext';
-import { PageHeader } from './PageHeader';
 
 import type { Post, PostCategory, User } from '../types';
 import { Spinner } from './Spinner';
@@ -33,9 +32,7 @@ export const CommunityHub: React.FC = () => {
 
   return (
     <div className="animate-fade-in pb-12">
-      <PageHeader title={t('community.pageTitle')} subtitle={t('community.pageSubtitle')} imageUrl="/images/scene-community.svg" />
-
-      <div className="mx-auto mt-[-4rem] max-w-6xl px-4">
+      <div className="mx-auto max-w-6xl px-4 pt-8">
         <SurfaceCard className="ui-surface p-5 md:p-6">
           <SectionHeading
             eyebrow={t('community.createPost')}

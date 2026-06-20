@@ -4592,7 +4592,7 @@ body.auth-modal-open .ui-floating-dock {
   background:
     radial-gradient(circle at 80% 18%, rgba(146, 208, 80, 0.18), transparent 15rem),
     radial-gradient(circle at 20% 78%, rgba(32, 207, 123, 0.12), transparent 18rem),
-    rgba(3, 13, 10, 0.58);
+    rgba(3, 13, 10, 0.34);
   backdrop-filter: blur(16px);
 }
 
@@ -4606,13 +4606,14 @@ body.auth-modal-open .ui-floating-dock {
 }
 
 .auth-visual-image {
-  opacity: 0;
+  opacity: 0.9;
+  object-position: center;
 }
 
 .auth-visual::after {
   background:
-    linear-gradient(90deg, rgba(3, 16, 12, 0.74), rgba(3, 16, 12, 0.26), rgba(3, 16, 12, 0.62)),
-    radial-gradient(circle at 50% 50%, transparent 10rem, rgba(0, 0, 0, 0.32));
+    linear-gradient(90deg, rgba(3, 16, 12, 0.86), rgba(3, 16, 12, 0.38), rgba(3, 16, 12, 0.72)),
+    radial-gradient(circle at 50% 50%, transparent 9rem, rgba(0, 0, 0, 0.26));
 }
 
 .auth-form-shell {
@@ -4623,15 +4624,25 @@ body.auth-modal-open .ui-floating-dock {
   justify-self: center;
   width: min(500px, calc(100% - 2rem));
   max-height: calc(100% - 3rem);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border: 1px solid rgba(210, 255, 196, 0.28);
   border-radius: 2rem;
   background:
-    linear-gradient(180deg, rgba(19, 38, 31, 0.86), rgba(6, 20, 16, 0.88)),
-    rgba(8, 23, 18, 0.82);
+    linear-gradient(180deg, rgba(19, 38, 31, 0.74), rgba(6, 20, 16, 0.72)),
+    rgba(8, 23, 18, 0.58);
+  backdrop-filter: blur(18px);
   box-shadow:
     0 34px 90px rgba(0, 0, 0, 0.48),
     0 0 0 1px rgba(146, 208, 80, 0.08) inset,
     0 0 36px rgba(101, 183, 65, 0.20);
+}
+
+.auth-form-shell::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .auth-form-head h2 {
