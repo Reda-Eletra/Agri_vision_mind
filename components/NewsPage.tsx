@@ -5,16 +5,9 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  Filter,
   Leaf,
   Newspaper,
-  Pause,
-  Play,
-  RefreshCw,
   Tag,
-  Volume2,
-  X,
 } from 'lucide-react';
 import { useTranslation } from '../contexts/LanguageContext';
 import { newsApi } from '../services/apiService';
@@ -111,8 +104,6 @@ const newsUi = {
 } as const;
 
 type NewsUi = typeof newsUi.en;
-
-const articleUrl = (article: NewsArticle) => article.sourceUrl || article.url;
 
 const localeDate = (article: NewsArticle, language: 'ar' | 'en', short = false) => {
   const rawDate = article.publishedAt || article.publishedDate;
@@ -279,47 +270,8 @@ const NewsDetail: React.FC<NewsDetailProps> = ({
   error,
   onBack,
 }) => {
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const paragraphs = articleParagraphs(article.content);
-  const originalUrl = articleUrl(article);
   const BackIcon = language === 'ar' ? ArrowRight : ArrowLeft;
-
-  const stopSpeech = useCallback(() => {
-    window.speechSynthesis?.cancel();
-    speechRef.current = null;
-    setIsSpeaking(false);
-    setIsPaused(false);
-  }, []);
-
-  useEffect(() => () => stopSpeech(), [stopSpeech]);
-
-  const toggleSpeech = () => {
-    if (!('speechSynthesis' in window)) return;
-    const speechEngine = window.speechSynthesis;
-    if (isSpeaking) {
-      if (speechEngine.paused) {
-        speechEngine.resume();
-        setIsPaused(false);
-      } else {
-        speechEngine.pause();
-        setIsPaused(true);
-      }
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(
-      `${article.title}. ${article.summary}. ${article.content || ''}`
-    );
-    utterance.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-    utterance.onend = stopSpeech;
-    utterance.onerror = stopSpeech;
-    speechRef.current = utterance;
-    speechEngine.cancel();
-    speechEngine.speak(utterance);
-    setIsSpeaking(true);
-  };
 
   return (
     <div className="animate-fade-in bg-[var(--ag-bg)] pb-16">
@@ -339,7 +291,7 @@ const NewsDetail: React.FC<NewsDetailProps> = ({
             alt={article.title}
             className="max-h-[22rem] min-h-56 w-full object-cover"
           />
-          <div className="grid gap-10 p-5 md:p-9 lg:grid-cols-[minmax(0,1fr)_16rem] lg:p-12">
+          <div className="p-5 md:p-9 lg:p-12">
             <main>
               <div className="flex flex-wrap items-center gap-2">
                 <CategoryBadge category={article.category} />
@@ -387,51 +339,6 @@ const NewsDetail: React.FC<NewsDetailProps> = ({
                 </>
               )}
             </main>
-
-            <aside className="h-fit rounded-2xl border border-[var(--ag-border)] bg-[var(--ag-surface-muted)] p-5 lg:sticky lg:top-6">
-              <dl className="space-y-5">
-                <div>
-                  <dt className="text-xs font-black uppercase tracking-[0.12em] text-[var(--ag-text-soft)]">
-                    {ui.sourceLabel}
-                  </dt>
-                  <dd className="mt-1 text-sm font-extrabold text-[var(--ag-text)]">
-                    {sourceName(article, ui.fallbackSource)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-black uppercase tracking-[0.12em] text-[var(--ag-text-soft)]">
-                    {ui.published}
-                  </dt>
-                  <dd className="mt-1 text-sm font-extrabold text-[var(--ag-text)]">
-                    {localeDate(article, language) || '—'}
-                  </dd>
-                </div>
-              </dl>
-
-              {'speechSynthesis' in window ? (
-                <button
-                  type="button"
-                  onClick={toggleSpeech}
-                  disabled={isLoading}
-                  className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--ag-border-strong)] bg-[var(--ag-surface)] px-4 text-sm font-extrabold text-[var(--ag-green)] transition hover:bg-[var(--color-primary-soft)] disabled:opacity-50"
-                >
-                  {isSpeaking && !isPaused ? <Pause size={17} /> : isPaused ? <Play size={17} /> : <Volume2 size={17} />}
-                  {isSpeaking && !isPaused ? ui.pause : isPaused ? ui.resume : ui.listen}
-                </button>
-              ) : null}
-
-              {originalUrl ? (
-                <a
-                  href={originalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--ag-green)] px-4 text-sm font-extrabold text-white transition hover:bg-[var(--ag-forest-strong)]"
-                >
-                  <ExternalLink size={16} />
-                  {ui.originalSource}
-                </a>
-              ) : null}
-            </aside>
           </div>
         </article>
       </div>
@@ -446,15 +353,11 @@ export const NewsPage: React.FC = () => {
   const detailRequestRef = useRef(0);
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
-  const [sources, setSources] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [selectedSource, setSelectedSource] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -464,7 +367,6 @@ export const NewsPage: React.FC = () => {
     setArticles(fallbackArticles);
     setTotalCount(fallbackArticles.length);
     setTotalPages(1);
-    setSources([...new Set(fallbackArticles.map((article) => article.source).filter(Boolean) as string[])]);
   }, [language]);
 
   const loadNews = useCallback(async () => {
@@ -479,16 +381,11 @@ export const NewsPage: React.FC = () => {
       const response = await newsApi.getList({
         page: currentPage,
         limit: NEWS_PAGE_SIZE,
-        source: selectedSource,
-        dateFrom,
-        dateTo,
       });
-      setSources(response.filters.sources);
       setTotalCount(response.pagination.total);
       setTotalPages(Math.max(1, response.pagination.totalPages || 1));
 
-      const hasFilters = Boolean(selectedSource || dateFrom || dateTo);
-      if (response.data.length > 0 || response.pagination.total > 0 || hasFilters) {
+      if (response.data.length > 0 || response.pagination.total > 0) {
         setArticles(response.data);
       } else {
         setFallbackArticles();
@@ -502,9 +399,6 @@ export const NewsPage: React.FC = () => {
   }, [
     backendEnabled,
     currentPage,
-    dateFrom,
-    dateTo,
-    selectedSource,
     setFallbackArticles,
     ui.loadError,
   ]);
@@ -542,13 +436,6 @@ export const NewsPage: React.FC = () => {
     window.scrollTo({ top: 0 });
   };
 
-  const clearFilters = () => {
-    setSelectedSource('');
-    setDateFrom('');
-    setDateTo('');
-    setCurrentPage(1);
-  };
-
   if (selectedArticle) {
     return (
       <NewsDetail
@@ -564,7 +451,6 @@ export const NewsPage: React.FC = () => {
 
   const featuredArticle = articles[0];
   const remainingArticles = articles.slice(1);
-  const hasActiveFilters = Boolean(selectedSource || dateFrom || dateTo);
 
   return (
     <div className="animate-fade-in bg-[var(--ag-bg)] pb-16">
@@ -576,7 +462,7 @@ export const NewsPage: React.FC = () => {
           style={{ backgroundImage: 'url("/images/avm-3d/news-smart-farming.png")' }}
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(7,25,16,0.97),rgba(17,71,43,0.93)_55%,rgba(44,78,45,0.88))]" />
-        <div className="mx-auto grid min-h-[24rem] max-w-6xl items-end gap-8 px-4 pb-20 pt-14 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:pb-20">
+        <div className="mx-auto grid min-h-[24rem] max-w-6xl items-end gap-8 px-4 pb-20 pt-14 lg:items-center lg:pb-20">
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/90 backdrop-blur">
               <Leaf size={15} aria-hidden="true" />
@@ -589,88 +475,10 @@ export const NewsPage: React.FC = () => {
               {ui.subtitle}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:w-64">
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <strong className="block text-2xl font-black">{totalCount.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}</strong>
-              <span className="mt-1 block text-xs font-bold text-white/75">{ui.total}</span>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <strong className="block text-2xl font-black">{sources.length.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')}</strong>
-              <span className="mt-1 block text-xs font-bold text-white/75">{ui.trustedSources}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => void loadNews()}
-              disabled={isLoading}
-              className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-extrabold text-[#14532d] transition hover:bg-[#f0f8ef] disabled:opacity-60"
-            >
-              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-              {isLoading ? ui.refreshing : ui.refresh}
-            </button>
-          </div>
         </div>
       </header>
 
       <div className="relative z-10 mx-auto -mt-12 max-w-6xl px-4">
-        <section className="rounded-[1.6rem] border border-[var(--ag-border)] bg-[var(--ag-surface)] p-5 shadow-[var(--ag-shadow-strong)] md:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-lg font-black text-[var(--ag-text)]">
-              <Filter size={19} className="text-[var(--ag-green)]" aria-hidden="true" />
-              {ui.filters}
-            </h2>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-extrabold text-[var(--ag-green)] hover:bg-[var(--color-primary-soft)]"
-              >
-                <X size={15} />
-                {ui.clear}
-              </button>
-            ) : null}
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_190px_190px]">
-            <label>
-              <span className="mb-1.5 block text-xs font-black text-[var(--ag-text-soft)]">{ui.source}</span>
-              <select
-                value={selectedSource}
-                onChange={(event) => {
-                  setSelectedSource(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className="ui-select min-h-11 w-full"
-              >
-                <option value="">{ui.allSources}</option>
-                {sources.map((source) => <option key={source} value={source}>{source}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className="mb-1.5 block text-xs font-black text-[var(--ag-text-soft)]">{ui.from}</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => {
-                  setDateFrom(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className="ui-input min-h-11 w-full"
-              />
-            </label>
-            <label>
-              <span className="mb-1.5 block text-xs font-black text-[var(--ag-text-soft)]">{ui.to}</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => {
-                  setDateTo(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className="ui-input min-h-11 w-full"
-              />
-            </label>
-          </div>
-        </section>
-
         {loadError ? (
           <div className="mt-6 rounded-2xl border border-[rgba(185,77,67,0.2)] bg-[var(--ag-red-soft)] px-5 py-4 text-sm font-bold text-[var(--ag-red)]">
             {loadError}

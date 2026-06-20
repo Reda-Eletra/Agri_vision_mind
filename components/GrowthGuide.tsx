@@ -131,7 +131,6 @@ export const GrowthGuide: React.FC = () => {
   const [plants, setPlants] = useState<GrowthGuidePlant[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -177,7 +176,6 @@ export const GrowthGuide: React.FC = () => {
       });
 
       setPlants(res.data);
-      setTotalCount(res.pagination.total);
       setTotalPages(res.pagination.totalPages);
       setCategories(res.filters.categories);
       setSources(res.filters.sources);
@@ -366,7 +364,9 @@ export const GrowthGuide: React.FC = () => {
       <PageHeader
         title={t('growthGuide.pageTitle')}
         subtitle={t('growthGuide.pageSubtitle')}
-        imageUrl="/images/scene-growth.svg"
+        imageUrl="/images/avm-3d/hero-seedling-hand.png"
+        eyebrow={language === 'ar' ? 'رعاية النباتات خطوة بخطوة' : 'Seasonal crop care'}
+        eyebrowIcon={<LeafIcon className="h-4 w-4" />}
       />
 
       {/* Main Subview Switch */}
@@ -424,22 +424,6 @@ export const GrowthGuide: React.FC = () => {
               </button>
             </form>
           </section>
-
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto mb-8 text-center">
-            <div className="ui-card p-4 rounded-2xl">
-              <div className="text-2xl font-black text-[var(--color-primary)]">{totalCount}</div>
-              <div className="text-xs text-[var(--ag-text-muted)]">{language === 'ar' ? 'نباتات متوفرة' : 'Crops'}</div>
-            </div>
-            <div className="ui-card p-4 rounded-2xl">
-              <div className="text-2xl font-black text-[var(--color-primary)]">{categories.length || 6}</div>
-              <div className="text-xs text-[var(--ag-text-muted)]">{language === 'ar' ? 'تصنيفات' : 'Categories'}</div>
-            </div>
-            <div className="ui-card p-4 rounded-2xl">
-              <div className="text-2xl font-black text-[var(--color-primary)]">{sources.length || 2}</div>
-              <div className="text-xs text-[var(--ag-text-muted)]">{language === 'ar' ? 'مصادر البيانات' : 'Sources'}</div>
-            </div>
-          </div>
 
           {/* Toolbar Filters */}
           <div className="ui-card p-5 mb-8 flex flex-col md:flex-row gap-4 justify-between items-center bg-[var(--ag-surface-muted)] rounded-2xl">

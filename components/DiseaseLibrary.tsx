@@ -5,7 +5,6 @@ import {
   ChevronRight,
   ExternalLink,
   Filter,
-  Leaf,
   RefreshCw,
   Search,
   Sprout,
@@ -389,21 +388,7 @@ export const DiseaseLibrary: React.FC<DiseaseLibraryProps> = ({ setActiveView: _
     <div className="animate-fade-in pb-12" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <section className="border-b border-[var(--ag-border)] bg-[var(--ag-surface)]">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div>
-              <div className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--ag-border)] bg-[var(--ag-surface-strong)] px-3 text-sm font-bold text-brand-green-dark dark:text-brand-green-light">
-                <Leaf className="h-4 w-4" aria-hidden="true" />
-                <span>{ui.source}</span>
-              </div>
-              <h1 className="text-3xl font-extrabold text-[var(--ag-text)] sm:text-4xl">{ui.title}</h1>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--ag-text-muted)]">{ui.subtitle}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <MetricPill value={formatCount(diseases.length, language === 'ar' ? 'ar' : 'en')} label={ui.records} />
-                <MetricPill value={formatCount(Math.max(categories.length - 1, 0), language === 'ar' ? 'ar' : 'en')} label={ui.problemTypes} />
-                <MetricPill value={formatCount(Math.max(hosts.length - 1, 0), language === 'ar' ? 'ar' : 'en')} label={ui.cropFilters} />
-              </div>
-            </div>
-
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => void loadDiseases(true)}
@@ -508,13 +493,6 @@ export const DiseaseLibrary: React.FC<DiseaseLibraryProps> = ({ setActiveView: _
     </div>
   );
 };
-
-const MetricPill: React.FC<{ value: string; label: string }> = ({ value, label }) => (
-  <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--ag-border)] bg-[var(--ag-surface-strong)] px-3 text-sm font-bold text-[var(--ag-text-muted)]">
-    <span className="text-brand-green-dark dark:text-brand-green-light">{value}</span>
-    <span>{label}</span>
-  </span>
-);
 
 interface FilterGroupProps {
   title: string;
