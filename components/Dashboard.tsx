@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Leaf,
   LineChart,
+  Map,
   MapPinned,
   Orbit,
   Settings,
@@ -16,6 +17,14 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Sun,
+  Droplets,
+  Sunrise,
+  Sunset,
+  Navigation,
+  Info,
+  Wind,
+  Compass,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -25,7 +34,7 @@ import { getWeatherData, predictDiseaseRisks } from '../services/weatherService'
 import { getRegionalOutbreaks } from '../services/staticDataService';
 import type { DiseasePrediction, Outbreak, PerformanceAnalyticsData, WeatherData } from '../types';
 import { Spinner } from './Spinner';
-import { AnalyticsView } from './AnalyticsView';
+import { MapRadarView } from './MapRadarView';
 import { AgriStore } from './AgriStore';
 import { FarmDetailView } from './FarmDetailView';
 import { FinanceView } from './FinanceView';
@@ -41,18 +50,45 @@ interface DashboardProps {
   onRequestedViewHandled?: () => void;
 }
 
-export type DashboardView = 'overview' | 'myFarms' | 'farmDetail' | 'satellite' | 'tracking' | 'analytics' | 'finance' | 'store' | 'settings';
+export type DashboardView = 'overview' | 'myFarms' | 'farmDetail' | 'satellite' | 'tracking' | 'mapRadar' | 'finance' | 'store' | 'settings';
 
 const navItems: Array<{ key: DashboardView; icon: React.ReactNode }> = [
   { key: 'overview', icon: <LayoutDashboard size={18} /> },
   { key: 'myFarms', icon: <MapPinned size={18} /> },
   { key: 'satellite', icon: <Orbit size={18} /> },
   { key: 'tracking', icon: <Activity size={18} /> },
-  { key: 'analytics', icon: <LineChart size={18} /> },
+  { key: 'mapRadar', icon: <Map size={18} /> },
   { key: 'finance', icon: <DollarSign size={18} /> },
   { key: 'store', icon: <ShoppingBag size={18} /> },
   { key: 'settings', icon: <Settings size={18} /> },
 ];
+
+export const resolveCoordsFromLocationString = (locStr: string): { lat: number; lng: number } | null => {
+  if (!locStr) return null;
+  const ls = locStr.toLowerCase().trim();
+  if (ls.includes('cairo') || ls.includes('القاهرة')) return { lat: 30.0444, lng: 31.2357 };
+  if (ls.includes('giza') || ls.includes('الجيزة')) return { lat: 30.0131, lng: 31.2089 };
+  if (ls.includes('alexandria') || ls.includes('الاسكندرية') || ls.includes('الإسكندرية')) return { lat: 31.2001, lng: 29.9187 };
+  if (ls.includes('ismailia') || ls.includes('الاسماعيلية') || ls.includes('الإسماعيلية')) return { lat: 30.6043, lng: 32.2723 };
+  if (ls.includes('suez') || ls.includes('السويس')) return { lat: 29.9668, lng: 32.5498 };
+  if (ls.includes('mansoura') || ls.includes('المنصورة')) return { lat: 31.0409, lng: 31.3785 };
+  if (ls.includes('tanta') || ls.includes('طنطا')) return { lat: 30.7865, lng: 30.9998 };
+  if (ls.includes('fayoum') || ls.includes('الفيوم')) return { lat: 29.3084, lng: 30.8428 };
+  if (ls.includes('luxor') || ls.includes('الأقصر') || ls.includes('الاقصر')) return { lat: 25.6872, lng: 32.6396 };
+  if (ls.includes('aswan') || ls.includes('أسوان') || ls.includes('اسوان')) return { lat: 24.0889, lng: 32.8998 };
+  if (ls.includes('port said') || ls.includes('بورسعيد')) return { lat: 31.2653, lng: 32.3019 };
+  
+  const coordsRegex = /(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/;
+  const match = locStr.match(coordsRegex);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+  return null;
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedView, onRequestedViewHandled }) => {
   const { user, farms, trackedPlants, diagnosisHistory } = useAuth();
@@ -64,6 +100,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedVi
   const [crowdAlert, setCrowdAlert] = useState<Outbreak | null>(null);
   const [predictions, setPredictions] = useState<DiseasePrediction[]>([]);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
+
+  const [overviewWeather, setOverviewWeather] = useState<WeatherData | null>(null);
+  const [isWeatherLoading, setIsWeatherLoading] = useState<boolean>(true);
+  const [locationStatus, setLocationStatus] = useState<'locating' | 'permission_denied' | 'unable_to_locate' | 'farm_weather' | 'profile_location' | 'approximate' | 'device_location'>('locating');
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [weatherCoords, setWeatherCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const diagnosesThisMonth = diagnosisHistory.filter(h => new Date(h.date).getMonth() === new Date().getMonth()).length;
   const avgHealthScore =
@@ -131,12 +173,146 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedVi
     }
   }, [farms, activeDashboardView]);
 
+  const resolveLocationAndFetchWeather = React.useCallback(async () => {
+    setIsWeatherLoading(true);
+    setOverviewWeather(null);
+    
+    // Helper to fetch weather for coordinates
+    const fetchWeatherForCoords = async (lat: number, lng: number, status: typeof locationStatus): Promise<boolean> => {
+      try {
+        const data = await getWeatherData(lat, lng, language);
+        setOverviewWeather(data);
+        setLocationStatus(status);
+        setWeatherCoords({ lat, lng });
+        const now = new Date().toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastUpdated(now);
+        return true;
+      } catch (err) {
+        console.error('Failed to fetch weather for coordinates:', lat, lng, err);
+        return false;
+      }
+    };
+
+    // Helper for selected/primary farm coordinates
+    const getFarmCoords = (): { lat: number; lng: number } | null => {
+      const activeFarm = farms.find(f => f.id === selectedFarmId) || farms[0];
+      if (activeFarm && activeFarm.coordinates && activeFarm.coordinates.length > 0) {
+        const lats = activeFarm.coordinates.map(c => c.lat);
+        const lngs = activeFarm.coordinates.map(c => c.lng);
+        return {
+          lat: lats.reduce((a, b) => a + b, 0) / lats.length,
+          lng: lngs.reduce((a, b) => a + b, 0) / lngs.length
+        };
+      }
+      return null;
+    };
+
+    // Helper for profile location string
+    const getProfileCoords = (): { lat: number; lng: number } | null => {
+      if (user?.location) {
+        return resolveCoordsFromLocationString(user.location);
+      }
+      return null;
+    };
+
+    // Tier 1: Browser Geolocation
+    const tryGeolocation = (): Promise<{ lat: number; lng: number } | null> => {
+      return new Promise((resolve) => {
+        if (!('geolocation' in navigator)) {
+          resolve(null);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          },
+          (err) => {
+            console.warn('Geolocation error:', err);
+            if (err.code === err.PERMISSION_DENIED) {
+              setLocationStatus('permission_denied');
+            } else {
+              setLocationStatus('unable_to_locate');
+            }
+            resolve(null);
+          },
+          { timeout: 5000, maximumAge: 60000 }
+        );
+      });
+    };
+
+    setLocationStatus('locating');
+
+    // 1. Try Geolocation
+    const geoCoords = await tryGeolocation();
+    if (geoCoords) {
+      const success = await fetchWeatherForCoords(geoCoords.lat, geoCoords.lng, 'device_location');
+      if (success) {
+        setIsWeatherLoading(false);
+        return;
+      }
+    }
+
+    // 2. Try Selected Farm / Primary Farm Coordinates
+    const farmCoords = getFarmCoords();
+    if (farmCoords) {
+      const success = await fetchWeatherForCoords(farmCoords.lat, farmCoords.lng, 'farm_weather');
+      if (success) {
+        setIsWeatherLoading(false);
+        return;
+      }
+    }
+
+    // 3. Try Profile Location Coordinates
+    const profileCoords = getProfileCoords();
+    if (profileCoords) {
+      const success = await fetchWeatherForCoords(profileCoords.lat, profileCoords.lng, 'profile_location');
+      if (success) {
+        setIsWeatherLoading(false);
+        return;
+      }
+    }
+
+    // 4. Default Fallback Location (Cairo, clearly labeled as approximate)
+    await fetchWeatherForCoords(30.0444, 31.2357, 'approximate');
+    setIsWeatherLoading(false);
+  }, [farms, selectedFarmId, user?.location, language]);
+
+  useEffect(() => {
+    if (activeDashboardView === 'overview') {
+      if (selectedFarmId) {
+        const farm = farms.find(f => f.id === selectedFarmId);
+        if (farm && farm.coordinates && farm.coordinates.length > 0) {
+          const lats = farm.coordinates.map(c => c.lat);
+          const lngs = farm.coordinates.map(c => c.lng);
+          const lat = lats.reduce((a, b) => a + b, 0) / lats.length;
+          const lng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+          
+          setIsWeatherLoading(true);
+          setOverviewWeather(null);
+          getWeatherData(lat, lng, language).then(data => {
+            setOverviewWeather(data);
+            setLocationStatus('farm_weather');
+            setWeatherCoords({ lat, lng });
+            const now = new Date().toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLastUpdated(now);
+            setIsWeatherLoading(false);
+          }).catch(() => {
+            resolveLocationAndFetchWeather();
+          });
+          return;
+        }
+      }
+      
+      resolveLocationAndFetchWeather();
+    }
+  }, [selectedFarmId, activeDashboardView, language, resolveLocationAndFetchWeather]);
+
   useEffect(() => {
     const runPredictions = async () => {
-      if (farms.length === 0) return;
+      if (farms.length === 0 || !weatherCoords) return;
       setLoadingPredictions(true);
       try {
-        const weatherData: WeatherData = await getWeatherData(30.0444, 31.2357, language);
+        const weatherData: WeatherData = await getWeatherData(weatherCoords.lat, weatherCoords.lng, language);
         const uniqueCrops = Array.from(new Set(farms.map(farm => farm.crop).filter(Boolean))) as string[];
         if (uniqueCrops.length > 0) {
           setPredictions(predictDiseaseRisks(weatherData, uniqueCrops));
@@ -151,13 +327,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedVi
     if (activeDashboardView === 'overview') {
       void runPredictions();
     }
-  }, [farms, language, activeDashboardView]);
+  }, [farms, language, activeDashboardView, weatherCoords]);
 
   useEffect(() => {
-    const outbreaks = getRegionalOutbreaks(30.0444, 31.2357, language);
+    if (!weatherCoords) return;
+    const outbreaks = getRegionalOutbreaks(weatherCoords.lat, weatherCoords.lng, language);
     const critical  = outbreaks.find(o => o.riskLevel === 'High' || o.riskLevel === 'Critical');
     if (critical) setCrowdAlert(critical);
-  }, [language]);
+  }, [language, weatherCoords]);
 
   useEffect(() => {
     if (!requestedView) return;
@@ -175,6 +352,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedVi
       case 'overview':
         return (
           <div className="space-y-6">
+            <WeatherOverviewCard 
+              weather={overviewWeather} 
+              isLoading={isWeatherLoading} 
+              locationStatus={locationStatus}
+              lastUpdated={lastUpdated}
+              onRefresh={resolveLocationAndFetchWeather}
+            />
             <SurfaceCard className="smart-dashboard-brief p-6 md:p-7">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -343,8 +527,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedVi
         return <TrackedPlantsView />;
       case 'satellite':
         return <SatelliteMonitoringView />;
-      case 'analytics':
-        return <AnalyticsView />;
+      case 'mapRadar':
+        return <MapRadarView />;
       case 'finance':
         return <FinanceView />;
       case 'store':
@@ -359,7 +543,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView, requestedVi
   return (
     <div className="ui-reveal">
       <div className="grid gap-6 xl:grid-cols-[290px_minmax(0,1fr)]">
-        <aside className="ui-surface-dark h-fit rounded-[2rem] p-5 xl:sticky xl:top-32 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto">
+        <aside className="ui-surface-dark h-full min-h-[calc(100vh-14rem)] rounded-[2rem] p-5">
           <div className="rounded-[1.6rem] border border-white/10 bg-white/8 p-4 backdrop-blur-xl">
             <div className="flex items-center gap-3">
               <IconBadge tone="forest" className="!bg-white/12 !text-white !border-white/12">
@@ -551,6 +735,192 @@ const ProductivityChart: React.FC<{ analytics: PerformanceAnalyticsData | null; 
           </svg>
         </div>
       )}
+    </SurfaceCard>
+  );
+};
+
+const getStatusText = (status: string, lang: string) => {
+  const isArabic = lang === 'ar';
+  switch (status) {
+    case 'locating':
+      return isArabic ? 'جارٍ تحديد الموقع...' : 'Locating...';
+    case 'permission_denied':
+      return isArabic ? 'تم رفض إذن الموقع' : 'Location Permission Denied';
+    case 'unable_to_locate':
+      return isArabic ? 'تعذر تحديد الموقع' : 'Unable to Locate';
+    case 'farm_weather':
+      return isArabic ? 'يتم عرض طقس المزرعة' : 'Showing Farm Weather';
+    case 'profile_location':
+      return isArabic ? 'يتم عرض طقس موقع الحساب' : 'Showing Profile Weather';
+    case 'approximate':
+      return isArabic ? 'يتم عرض موقع تقريبي' : 'Showing Approximate Location';
+    case 'device_location':
+      return isArabic ? 'يتم عرض طقس موقعك الفعلي' : 'Showing Device Weather';
+    default:
+      return '';
+  }
+};
+
+const WeatherOverviewCard: React.FC<{
+  weather: WeatherData | null;
+  isLoading: boolean;
+  locationStatus: 'locating' | 'permission_denied' | 'unable_to_locate' | 'farm_weather' | 'profile_location' | 'approximate' | 'device_location';
+  lastUpdated: string | null;
+  onRefresh: () => void;
+}> = ({ weather, isLoading, locationStatus, lastUpdated, onRefresh }) => {
+  const { language } = useTranslation();
+  const locale = language === 'ar' ? 'ar' : 'en';
+
+  if (isLoading) {
+    return (
+      <SurfaceCard className="p-6 flex items-center justify-center h-48 border border-gray-150/70 dark:border-gray-700/65">
+        <div className="flex flex-col items-center gap-2">
+          <Spinner />
+          <span className="text-xs text-gray-400">
+            {locale === 'ar' ? 'جاري تحميل بيانات الطقس والموقع...' : 'Loading weather & location data...'}
+          </span>
+        </div>
+      </SurfaceCard>
+    );
+  }
+
+  if (!weather) return null;
+
+  // Rule-based advice
+  const isHighWind = weather.wind > 20;
+  const isRainy = weather.condition.toLowerCase().includes('rain') || weather.condition.toLowerCase().includes('مطر') || weather.condition.toLowerCase().includes('سحاب') || weather.condition.toLowerCase().includes('cloud');
+  
+  let adviceAr = 'الطقس مستقر ومناسب تماماً للعمل الميداني والرش والري.';
+  let adviceEn = 'Weather is stable and perfectly suitable for field work, spraying, and irrigation.';
+
+  if (isHighWind) {
+    adviceAr = 'الرياح نشطة نسبياً (أكثر من 20 كم/ساعة)، يرجى تجنب رش المبيدات لتفادي الانجراف.';
+    adviceEn = 'Winds are active (above 20 km/h). Please avoid spraying pesticides to prevent drift.';
+  } else if (isRainy) {
+    adviceAr = 'يتوقع هطول أمطار أو غيوم كثيفة؛ ننصح بمراجعة رطوبة التربة وتعديل مواعيد الري.';
+    adviceEn = 'Rain or heavy clouds forecasted. Consider checking soil moisture and delaying irrigation.';
+  }
+
+  return (
+    <SurfaceCard className="relative overflow-hidden border border-gray-150/60 dark:border-gray-700/60 p-6 md:p-7 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 dark:from-emerald-950/20 dark:to-transparent">
+      {/* Background radial highlight */}
+      <div className="absolute -right-16 -top-16 w-48 h-48 bg-brand-green/10 dark:bg-brand-green/20 rounded-full blur-3xl pointer-events-none" />
+      
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+        
+        {/* Main temperature and location */}
+        <div className="flex items-center gap-4 md:gap-5">
+          <div className="text-4xl md:text-5xl p-3 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-750 shadow-sm flex items-center justify-center shrink-0">
+            {weather.icon || '☀️'}
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-brand-green uppercase tracking-wider">
+                <Navigation className="w-3.5 h-3.5 text-brand-green animate-pulse" />
+                <span>{weather.location}</span>
+              </div>
+              <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-md tracking-wider ${
+                locationStatus === 'permission_denied' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                locationStatus === 'unable_to_locate' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                locationStatus === 'farm_weather' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                locationStatus === 'profile_location' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                locationStatus === 'approximate' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+              }`}>
+                {getStatusText(locationStatus, locale)}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                {Math.round(weather.temperature)}°C
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-450 ml-1">
+                ({locale === 'ar' ? 'المحسوسة' : 'Feels'} {Math.round(weather.feels_like ?? weather.temperature)}°C)
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 capitalize">
+                {weather.condition}
+              </p>
+              {lastUpdated && (
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold">
+                  • {locale === 'ar' ? 'تحديث: ' : 'Updated: '}{lastUpdated}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic AI Advice strip */}
+        <div className="flex-1 lg:max-w-md bg-white dark:bg-gray-800/80 p-4 rounded-2xl border border-gray-100 dark:border-gray-750 shadow-sm flex items-start gap-3">
+          <div className="p-1.5 bg-brand-green/10 dark:bg-brand-green/20 rounded-xl text-brand-green mt-0.5 shrink-0">
+            <Info className="w-4 h-4 text-brand-green" />
+          </div>
+          <div>
+            <h4 className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400">
+              {locale === 'ar' ? 'توصيات العمل الميداني والري' : 'Field Work & Irrigation Advisory'}
+            </h4>
+            <p className="text-[11px] text-gray-600 dark:text-gray-350 leading-relaxed mt-1 font-semibold">
+              {locale === 'ar' ? adviceAr : adviceEn}
+            </p>
+          </div>
+        </div>
+
+        {/* Detailed parameters */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 min-w-[280px]">
+          <div className="bg-gray-50/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-750/50 flex flex-col justify-center">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+              <Droplets className="w-3.5 h-3.5 text-blue-500" />
+              {locale === 'ar' ? 'الرطوبة' : 'Humidity'}
+            </span>
+            <span className="text-xs font-bold text-gray-800 dark:text-white mt-1">
+              {weather.humidity}%
+            </span>
+          </div>
+
+          <div className="bg-gray-50/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-750/50 flex flex-col justify-center">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-455 flex items-center gap-1">
+              <Wind className="w-3.5 h-3.5 text-teal-500" />
+              {locale === 'ar' ? 'الرياح' : 'Wind Speed'}
+            </span>
+            <span className="text-xs font-bold text-gray-800 dark:text-white mt-1">
+              {weather.wind} km/h
+            </span>
+          </div>
+
+          <div className="bg-gray-50/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-750/50 flex flex-col justify-center">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-455 flex items-center gap-1">
+              <Sunrise className="w-3.5 h-3.5 text-amber-500" />
+              {locale === 'ar' ? 'الشروق والغروب' : 'Sun Times'}
+            </span>
+            <span className="text-[10px] font-bold text-gray-800 dark:text-white mt-1">
+              {weather.sunrise} / {weather.sunset}
+            </span>
+          </div>
+
+          <div className="bg-gray-50/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-750/50 flex flex-col justify-center">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-455 flex items-center gap-1">
+              <Compass className="w-3.5 h-3.5 text-indigo-400" />
+              {locale === 'ar' ? 'الضغط' : 'Pressure'}
+            </span>
+            <span className="text-[10px] font-extrabold text-gray-800 dark:text-white mt-1">
+              {weather.pressure} hPa ({Math.round(weather.temp_min ?? 0)}°-{Math.round(weather.temp_max ?? 0)}°)
+            </span>
+          </div>
+        </div>
+
+        {/* Refresh button */}
+        <div className="flex items-center lg:self-stretch justify-center lg:justify-end">
+          <button 
+            onClick={onRefresh} 
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95 duration-200"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand-green animate-pulse"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>{locale === 'ar' ? 'تحديث الطقس' : 'Refresh Weather'}</span>
+          </button>
+        </div>
+
+      </div>
     </SurfaceCard>
   );
 };

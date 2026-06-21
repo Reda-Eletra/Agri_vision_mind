@@ -23,6 +23,10 @@ const truncateDate = (unit, value) => {
 };
 
 const registerFunctions = (database) => {
+  database.registerLanguage("plpgsql", () => {
+    return () => {};
+  });
+
   database.public.registerFunction({
     name: "gen_random_uuid",
     returns: DataType.uuid,

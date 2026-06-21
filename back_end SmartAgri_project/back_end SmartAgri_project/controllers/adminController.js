@@ -201,6 +201,139 @@ const getUserDiagnoses = async (req, res) => {
   }
 };
 
+// ─── GET /admin/users/:id/details ─────────────────────────────
+const getUserDetails = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const userResult = await pool.query(
+      `SELECT id, name, email, username, phone, location, avatar_url, role,
+              auth_provider, is_active, created_at
+       FROM users
+       WHERE id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const [
+      farmsResult,
+      coordinatesResult,
+      cyclesResult,
+      cyclePlantsResult,
+      userPlantsResult,
+      cycleScansResult,
+      doctorScansResult,
+      transactionsResult,
+    ] = await Promise.all([
+      pool.query(
+        `SELECT id, name, location, area, area_unit, soil_type, image_url,
+                satellite_polygon_id, created_at
+         FROM farms
+         WHERE user_id = $1
+         ORDER BY created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT fc.farm_id, fc.latitude, fc.longitude, fc.order_index
+         FROM farm_coordinates fc
+         JOIN farms f ON f.id = fc.farm_id
+         WHERE f.user_id = $1
+         ORDER BY fc.farm_id, fc.order_index ASC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT c.id, c.farm_id, c.crop, c.season, c.planting_date,
+                c.harvest_date, c.status, c.created_at
+         FROM farm_cycles c
+         JOIN farms f ON f.id = c.farm_id
+         WHERE f.user_id = $1
+         ORDER BY c.created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT tp.id, tp.farm_cycle_id, tp.user_defined_name, tp.species_name,
+                tp.image_url, tp.recovery_progress_percent, tp.last_check_date, tp.created_at
+         FROM tracked_plants tp
+         JOIN farm_cycles c ON c.id = tp.farm_cycle_id
+         JOIN farms f ON f.id = c.farm_id
+         WHERE f.user_id = $1
+         ORDER BY tp.created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT id, name, species_name, image_url, health_status,
+                recovery_progress_percent, last_check_date, diagnosis_json,
+                progress_log_json, created_at
+         FROM user_tracked_plants
+         WHERE user_id = $1
+         ORDER BY created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT dh.id, dh.created_at, dh.image_url, dh.disease_name, dh.confidence,
+                dh.severity, dh.recommendations, tp.user_defined_name, tp.species_name
+         FROM diagnosis_history dh
+         LEFT JOIN tracked_plants tp ON tp.id = dh.plant_id
+         WHERE dh.user_id = $1
+         ORDER BY dh.created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT id, date, plant_name, image_url, diagnosis, created_at
+         FROM user_diagnosis_history
+         WHERE user_id = $1
+         ORDER BY created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT id, farm_id, amount, type, category, description, date, created_at
+         FROM transactions
+         WHERE user_id = $1
+         ORDER BY date DESC`,
+        [userId]
+      ),
+    ]);
+
+    const coordinatesByFarm = coordinatesResult.rows.reduce((groups, coordinate) => {
+      groups[coordinate.farm_id] = groups[coordinate.farm_id] || [];
+      groups[coordinate.farm_id].push(coordinate);
+      return groups;
+    }, {});
+    const plantsByCycle = cyclePlantsResult.rows.reduce((groups, plant) => {
+      groups[plant.farm_cycle_id] = groups[plant.farm_cycle_id] || [];
+      groups[plant.farm_cycle_id].push(plant);
+      return groups;
+    }, {});
+    const cyclesByFarm = cyclesResult.rows.reduce((groups, cycle) => {
+      groups[cycle.farm_id] = groups[cycle.farm_id] || [];
+      groups[cycle.farm_id].push({ ...cycle, plants: plantsByCycle[cycle.id] || [] });
+      return groups;
+    }, {});
+    const farms = farmsResult.rows.map((farm) => ({
+      ...farm,
+      coordinates: coordinatesByFarm[farm.id] || [],
+      cycles: cyclesByFarm[farm.id] || [],
+    }));
+
+    res.json({
+      message: 'Success',
+      data: {
+        user: userResult.rows[0],
+        farms,
+        standalonePlants: userPlantsResult.rows,
+        diagnoses: {
+          farmScans: cycleScansResult.rows,
+          plantDoctor: doctorScansResult.rows,
+        },
+        transactions: transactionsResult.rows,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // ─── GET /admin/posts ─────────────────────────────────────────
 const getAllPosts = async (req, res) => {
   try {
@@ -506,6 +639,7 @@ module.exports = {
   updateUser,
   deleteUser,
   getUserDiagnoses,
+  getUserDetails,
   getAllPosts,
   adminDeletePost,
   getAdminGrowthGuides,

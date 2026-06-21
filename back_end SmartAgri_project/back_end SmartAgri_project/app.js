@@ -19,6 +19,7 @@ const newsRoutes       = require('./routes/newsRoutes');
 const diseaseLibraryRoutes = require('./routes/diseaseLibraryRoutes');
 const growthGuideRoutes = require('./routes/growthGuideRoutes');
 const storeRoutes       = require('./routes/storeRoutes');
+const contactRoutes     = require('./routes/contactRoutes');
 const errorHandler     = require('./middlewares/errorHandler');
 
 const app = express();
@@ -154,6 +155,7 @@ app.use('/api', newsRoutes);
 app.use('/api', diseaseLibraryRoutes);
 app.use('/api', growthGuideRoutes);
 app.use('/api', storeRoutes);
+app.use('/api', contactRoutes);
 
 // ─── Health Check ────────────────────────────────────────────
 app.get('/health', (_req, res) => {

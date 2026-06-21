@@ -236,6 +236,33 @@ export interface DiseaseInfo {
   updatedAt?: string;
 }
 
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  status: "new" | "read" | "archived";
+  createdAt?: string;
+  created_at?: string;
+  readAt?: string | null;
+  read_at?: string | null;
+}
+
+export interface AdminUserDetails {
+  user: Record<string, unknown>;
+  farms: Array<Record<string, unknown> & {
+    coordinates?: Record<string, unknown>[];
+    cycles?: Array<Record<string, unknown> & { plants?: Record<string, unknown>[] }>;
+  }>;
+  standalonePlants: Record<string, unknown>[];
+  diagnoses: {
+    farmScans: Record<string, unknown>[];
+    plantDoctor: Record<string, unknown>[];
+  };
+  transactions: Record<string, unknown>[];
+}
+
 export interface TranscriptEntry {
   speaker: "user" | "model";
   text: string;
@@ -249,6 +276,11 @@ export interface WeatherData {
   pressure: number;
   humidity: number;
   wind: number;
+  feels_like?: number;
+  temp_min?: number;
+  temp_max?: number;
+  sunrise?: string;
+  sunset?: string;
   forecast: {
     day: string;
     temp_high: number;
@@ -297,10 +329,19 @@ export interface GeoAgriData {
 }
 
 export interface LiveAnalysisResult {
+  isPlantDetected: boolean;
+  confidence: number;
+  message: string;
   detected: boolean;
   issues: string[]; // e.g. "Yellowing Leaves", "Aphids"
-  confidence: number;
   action: string;
+}
+
+export interface PlantAnalysisResult {
+  isPlantDetected: boolean;
+  confidence: number;
+  message: string;
+  diagnosis: PlantDiagnosis | null;
 }
 
 export interface GrowthAnalysisResult {
@@ -507,7 +548,17 @@ export interface SatelliteNdviInsight {
   ndvi: NdviStats;
   ndviImageUrl: string;
   trueColorImageUrl: string;
+  falseColorImageUrl?: string;
   ndviTileTemplate?: string;
+  evi?: { mean: number; min: number; max: number };
+  evi2?: { mean: number; min: number; max: number };
+  ndwi?: { mean: number; min: number; max: number };
+  dswi?: { mean: number; min: number; max: number };
+  nri?: { mean: number; min: number; max: number };
+  soilData?: { moisture: number; temperature: number };
+  accumulatedRainfall?: number;
+  accumulatedGdd?: number;
+  history?: Array<{ date: string; ndvi: number; evi?: number; ndwi?: number }>;
 }
 
 export interface GrowthGuidePlant {

@@ -15,6 +15,15 @@ const parseJsonArray = (value) => {
   return [];
 };
 
+const normalizeArrayInput = (input) => {
+  if (!input) return [];
+  if (Array.isArray(input)) return input.map((entry) => String(entry).trim()).filter(Boolean);
+  return String(input)
+    .split(/\r?\n|,/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
 const mapRow = (row) => ({
   id: row.id,
   name: row.name,
@@ -125,6 +134,62 @@ const getAdminDiseaseLibrary = async (req, res) => {
   }
 };
 
+const createAdminDisease = async (req, res) => {
+  try {
+    const diseaseName = String(req.body.name || '').trim();
+    const description = String(req.body.description || '').trim();
+    if (!diseaseName || !description) {
+      return res.status(400).json({ error: 'Disease name and description are required' });
+    }
+
+    const insertResult = await pool.query(
+      `INSERT INTO disease_library (
+         name, description, symptoms_json, treatment_json, prevention_json,
+         image_url, category, hosts_json, scientific_name, language,
+         source_name, source_article_id, is_imported, is_visible
+       )
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9, $10,
+               'Manual Admin Input', $11, FALSE, TRUE)
+       RETURNING *`,
+      [
+        diseaseName,
+        description,
+        JSON.stringify(normalizeArrayInput(req.body.symptoms)),
+        JSON.stringify(normalizeArrayInput(req.body.treatment)),
+        JSON.stringify(normalizeArrayInput(req.body.prevention)),
+        req.body.imageUrl || req.body.image_url || null,
+        req.body.category || 'plant-disease',
+        JSON.stringify(normalizeArrayInput(req.body.hosts)),
+        req.body.scientificName || req.body.scientific_name || null,
+        req.body.language === 'en' ? 'en' : 'ar',
+        `manual-${Date.now()}`,
+      ]
+    );
+
+    res.status(201).json({ message: 'Disease entry created', data: mapRow(insertResult.rows[0]) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteAdminDisease = async (req, res) => {
+  try {
+    const deleteResult = await pool.query(
+      `UPDATE disease_library
+       SET deleted_at = NOW(), is_visible = FALSE, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id`,
+      [req.params.id]
+    );
+    if (deleteResult.rows.length === 0) return res.status(404).json({ error: 'Disease entry not found' });
+    res.json({ message: 'Disease entry deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const syncDiseaseLibrary = async (_req, res) => {
   try {
     const result = await syncImportedDiseaseLibrary();
@@ -139,5 +204,7 @@ module.exports = {
   getDiseaseLibrary,
   getDiseaseById,
   getAdminDiseaseLibrary,
+  createAdminDisease,
+  deleteAdminDisease,
   syncDiseaseLibrary,
 };

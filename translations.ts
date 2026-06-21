@@ -109,7 +109,7 @@ export const translations = {
                 myFarms: 'My Farms',
                 satellite: 'Satellite',
                 tracking: 'Tracking',
-                analytics: 'Analytics',
+                mapRadar: 'Map & Radar',
                 finance: 'Finance',
                 store: 'Agricultural Store',
                 forecasts: 'Forecasts',
@@ -177,6 +177,25 @@ export const translations = {
                 },
                 insightsTitle: 'AI Insights',
                 yieldPrediction: 'Yield Prediction'
+            },
+            mapRadar: {
+                title: 'Map & Radar',
+                subtitle: 'Interactive live weather satellite, precipitation radar, and wind particle systems.',
+                layersTitle: 'Radar Layers',
+                wind: 'Wind Flow Particles',
+                windDesc: 'Visualize global wind speed and direction in real-time. Crucial for determining optimal pesticide spraying windows and windbreak planning.',
+                radar: 'Precipitation Radar',
+                radarDesc: 'Track live rain, snow, and lightning systems. Predict immediate precipitation to manage irrigation cycles and protect open fields.',
+                temp: 'Temperature Heatmap',
+                tempDesc: 'Observe air temperature patterns. Useful for identifying frost risks, heatwaves, and preparing thermal protection for sensitive crops.',
+                clouds: 'Cloud & Satellite Cover',
+                cloudsDesc: 'Check actual cloud density. Directly impacts solar radiation reaching crops and photosynthesis rates.',
+                pressure: 'Sea Pressure Systems',
+                pressureDesc: 'Monitor high and low pressure systems to anticipate incoming storm fronts, severe cold snaps, or prolonged dry spells.',
+                humidity: 'Relative Humidity',
+                humidityDesc: 'Evaluate atmospheric moisture. Helps identify conditions favorable for fungal growth and transpiration rates.',
+                zoomEarthDisclaimer: 'Note: Direct embedding of Zoom.Earth is restricted by their security headers. This interactive Map & Radar dashboard provides equivalent high-resolution satellite imagery, real-time animated wind systems, and live weather radar layers for advanced farm planning.',
+                zoomInHint: '💡 Tip: Zoom in on any region or search for a specific location to track microclimatic weather details directly.'
             },
             myFarms: 'My Farms',
             noFarms: 'No Farms Added',
@@ -329,7 +348,11 @@ export const translations = {
                 alert: 'Issue Detected',
                 noIssues: 'Healthy',
                 growthHeight: 'Est. Height',
-                growthStage: 'Stage'
+                growthStage: 'Stage',
+                stopAnalysis: 'Stop Analysis',
+                startAnalysis: 'Start Analysis',
+                noPlantTitle: 'No Plant Detected',
+                noPlantMessage: 'No plant detected. Point the camera at a clear plant and try again.'
             }
         },
         growthGuide: {
@@ -884,7 +907,7 @@ export const translations = {
                 myFarms: 'مزارعي',
                 satellite: 'الأقمار الصناعية',
                 tracking: 'التتبع',
-                analytics: 'التحليلات',
+                mapRadar: 'الخريطة والرادار',
                 finance: 'المالية',
                 store: 'المتجر الزراعي',
                 forecasts: 'التوقعات',
@@ -952,6 +975,25 @@ export const translations = {
                 },
                 insightsTitle: 'رؤى الذكاء الاصطناعي',
                 yieldPrediction: 'توقع الإنتاج'
+            },
+            mapRadar: {
+                title: 'الخريطة والرادار الجوي',
+                subtitle: 'رادار حي تفاعلي للأمطار، حركة الرياح، وتغطية السحب والخرائط الجوية.',
+                layersTitle: 'طبقات الرادار',
+                wind: 'حركة وجزيئات الرياح',
+                windDesc: 'تتبع سرعة واتجاه الرياح مباشرة. هام جداً لتحديد أوقات رش المبيدات وتجنب تطايرها، والتخطيط لمصدات الرياح.',
+                radar: 'رادار الأمطار والبرق',
+                radarDesc: 'مراقبة حية وجدول زمني للأمطار والثلوج والعواصف الرعدية. يساعد على ضبط جدول الري وحماية الحقول المفتوحة من الفيضانات المفاجئة.',
+                temp: 'خريطة درجات الحرارة',
+                tempDesc: 'مراقبة التوزيع الحراري. يفيد في التنبؤ ببدء الصقيع، موجات الحر الشديدة، وتجهيز تدابير وقائية للمحاصيل الحساسة.',
+                clouds: 'غطاء السحب والأقمار',
+                cloudsDesc: 'رصد كثافة الغيوم الحالية، مما يؤثر بشكل مباشر على كمية الضوء الشمسي الواصل للنبات ومعدلات البناء الضوئي.',
+                pressure: 'أنظمة الضغط الجوي',
+                pressureDesc: 'تتبع منخفضات ومرتفعات الضغط الجوي للتنبؤ بالعواصف القادمة، موجات البرد الشديدة، أو فترات الجفاف المستقرة.',
+                humidity: 'الرطوبة النسبية',
+                humidityDesc: 'قياس كمية الرطوبة في الجو للتنبؤ ببيئات انتشار الأمراض الفطرية وضبط تبخر مياه الري.',
+                zoomEarthDisclaimer: 'تنبيه: لا تسمح منصة Zoom.Earth بدمج خرائطها مباشرة لأسباب تتعلق بخصوصية الأمان لديهم. توفر لك هذه الخريطة والرادار التفاعلي نفس جودة البيانات الحية للأقمار الصناعية وحركة الرياح ورادارات الطقس لإدارة التخطيط الجوي بكفاءة.',
+                zoomInHint: '💡 نصيحة: قم بتقريب الخريطة (Zoom in) لمشاهدة التفاصيل الدقيقة وحركة السحب والرياح فوق أي منطقة مباشرة.'
             },
             myFarms: 'مزارعي',
             noFarms: 'لم تتم إضافة مزارع',
@@ -1104,7 +1146,11 @@ export const translations = {
                 alert: 'تم اكتشاف مشكلة',
                 noIssues: 'صحي',
                 growthHeight: 'الارتفاع التقديري',
-                growthStage: 'المرحلة'
+                growthStage: 'المرحلة',
+                stopAnalysis: 'إيقاف التحليل',
+                startAnalysis: 'بدء التحليل',
+                noPlantTitle: 'لم يتم اكتشاف نبات',
+                noPlantMessage: 'لم يتم اكتشاف نبات. وجّه الكاميرا نحو نبات واضح ثم حاول مرة أخرى.'
             }
         },
         growthGuide: {

@@ -39,21 +39,52 @@ const resolveIcon = (code: string | undefined, condition: string): string => {
 };
 
 // ─── Static fallback (no API key) ─────────────────────────
-const staticFallback = (): WeatherData => {
+const staticFallback = (lat = 30.0444, lng = 31.2357, language = 'ar'): WeatherData => {
   const month = new Date().getMonth(); // 0-11
   const isSummer = month >= 4 && month <= 8;
+  const isAr = language.toLowerCase().startsWith('ar');
+  const locationName = isAr
+    ? `موقع تقريبي (${lat.toFixed(2)}، ${lng.toFixed(2)})`
+    : `Approximate Location (${lat.toFixed(2)}, ${lng.toFixed(2)})`;
+    
   return {
-    location:    'Your Location',
+    location:    locationName,
     temperature: isSummer ? 34 : 18,
-    condition:   isSummer ? 'Sunny and hot' : 'Clear and mild',
+    condition:   isSummer 
+      ? (isAr ? 'مشمس وحار' : 'Sunny and hot') 
+      : (isAr ? 'صاف ومعتدل' : 'Clear and mild'),
     icon:        isSummer ? '☀️' : '🌤️',
     pressure:    1013,
     humidity:    isSummer ? 45 : 60,
     wind:        12,
+    feels_like:  isSummer ? 36 : 17,
+    temp_min:    isSummer ? 22 : 10,
+    temp_max:    isSummer ? 38 : 22,
+    sunrise:     isAr ? '05:12 ص' : '05:12 AM',
+    sunset:      isAr ? '06:48 م' : '06:48 PM',
     forecast: [
-      { day: 'Tomorrow',  temp_high: isSummer ? 36 : 19, temp_low: isSummer ? 24 : 12, condition: isSummer ? 'Sunny' : 'Partly cloudy' },
-      { day: 'Day after', temp_high: isSummer ? 35 : 21, temp_low: isSummer ? 23 : 13, condition: 'Clear' },
-      { day: 'In 3 days', temp_high: isSummer ? 33 : 20, temp_low: isSummer ? 22 : 11, condition: isSummer ? 'Hot' : 'Mild' },
+      { 
+        day: isAr ? 'غداً' : 'Tomorrow',  
+        temp_high: isSummer ? 36 : 19, 
+        temp_low: isSummer ? 24 : 12, 
+        condition: isSummer 
+          ? (isAr ? 'مشمس' : 'Sunny') 
+          : (isAr ? 'غائم جزئياً' : 'Partly cloudy') 
+      },
+      { 
+        day: isAr ? 'بعد غد' : 'Day after', 
+        temp_high: isSummer ? 35 : 21, 
+        temp_low: isSummer ? 23 : 13, 
+        condition: isAr ? 'صاف' : 'Clear' 
+      },
+      { 
+        day: isAr ? 'خلال 3 أيام' : 'In 3 days', 
+        temp_high: isSummer ? 33 : 20, 
+        temp_low: isSummer ? 22 : 11, 
+        condition: isSummer 
+          ? (isAr ? 'حار' : 'Hot') 
+          : (isAr ? 'معتدل' : 'Mild') 
+      },
     ],
   };
 };
@@ -65,7 +96,7 @@ export const getWeatherData = async (lat: number, lng: number, language: string)
   if (cached) return cached;
 
   if (!OWM_KEY) {
-    return staticFallback();
+    return staticFallback(lat, lng, language);
   }
 
   const lang   = language.toLowerCase().startsWith('ar') ? 'ar' : 'en';
@@ -79,10 +110,17 @@ export const getWeatherData = async (lat: number, lng: number, language: string)
 
     if (!curRes.ok || !foreRes.ok) {
       console.warn('Weather API error, using fallback');
-      return staticFallback();
+      return staticFallback(lat, lng, language);
     }
 
-    const cur  = await curRes.json()  as { name: string; sys: { country: string }; dt: number; main: { temp: number; pressure: number; humidity: number }; wind: { speed: number }; weather: { description: string; icon: string }[] };
+    const cur  = await curRes.json()  as { 
+      name: string; 
+      sys: { country: string; sunrise: number; sunset: number }; 
+      dt: number; 
+      main: { temp: number; feels_like: number; temp_min: number; temp_max: number; pressure: number; humidity: number }; 
+      wind: { speed: number }; 
+      weather: { description: string; icon: string }[] 
+    };
     const fore = await foreRes.json() as { list: { dt: number; dt_txt: string; main: { temp_min: number; temp_max: number }; weather: { description: string; icon: string }[] }[] };
 
     const todayKey  = new Date(cur.dt * 1000).toISOString().split('T')[0];
@@ -123,13 +161,18 @@ export const getWeatherData = async (lat: number, lng: number, language: string)
       pressure:    cur.main?.pressure ?? 0,
       humidity:    cur.main?.humidity ?? 0,
       wind:        Number(((cur.wind?.speed ?? 0) * 3.6).toFixed(1)),
+      feels_like:  cur.main?.feels_like ?? cur.main?.temp,
+      temp_min:    cur.main?.temp_min ?? cur.main?.temp,
+      temp_max:    cur.main?.temp_max ?? cur.main?.temp,
+      sunrise:     new Date(cur.sys?.sunrise * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+      sunset:      new Date(cur.sys?.sunset * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
       forecast,
     };
 
     _cache.set(cacheKey, { data: result, ts: Date.now() });
     return result;
   } catch {
-    return staticFallback();
+    return staticFallback(lat, lng, language);
   }
 };
 

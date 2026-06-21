@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from '../contexts/LanguageContext';
 import { newsApi, adminApi, diseaseLibraryApi } from '../services/apiService';
 import { PageHeader } from './PageHeader';
-import type { AdminStats, NewsArticle, User, GrowthGuidePlant, GrowthGuideSyncStatus, DiseaseInfo } from '../types';
+import type { AdminStats, NewsArticle, User, GrowthGuidePlant, GrowthGuideSyncStatus, DiseaseInfo, ContactMessage, AdminUserDetails } from '../types';
 import { EmptyPanel, SectionHeading, StatTile, StatusChip, SurfaceCard } from './WorkspacePrimitives';
 
 // ─── Edit User Modal ──────────────────────────────────────────
@@ -104,22 +104,27 @@ const EditUserModal: React.FC<EditModalProps> = ({ target, onClose, onSave }) =>
 // ─── Diagnoses Panel ─────────────────────────────────────────
 interface DiagnosesRowProps {
   userId: string;
-  getUserDiagnoses: (id: string) => Promise<Record<string, unknown>[]>;
+  getUserDetails: (id: string) => Promise<AdminUserDetails>;
 }
-const DiagnosesRow: React.FC<DiagnosesRowProps> = ({ userId, getUserDiagnoses }) => {
-  const [open,      setOpen]      = useState(false);
-  const [diagnoses, setDiagnoses] = useState<Record<string, unknown>[]>([]);
-  const [loading,   setLoading]   = useState(false);
+const DiagnosesRow: React.FC<DiagnosesRowProps> = ({ userId, getUserDetails }) => {
+  const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState<AdminUserDetails | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const toggle = async () => {
-    if (!open && diagnoses.length === 0) {
+    if (!open && !details) {
       setLoading(true);
-      try { setDiagnoses(await getUserDiagnoses(userId)); }
+      try { setDetails(await getUserDetails(userId)); }
       catch { /* ignore */ }
       finally { setLoading(false); }
     }
     setOpen((v) => !v);
   };
+
+  const farmScans = details?.diagnoses.farmScans || [];
+  const doctorScans = details?.diagnoses.plantDoctor || [];
+  const transactions = details?.transactions || [];
+  const diagnoses = [...farmScans, ...doctorScans];
 
   return (
     <>
@@ -130,17 +135,46 @@ const DiagnosesRow: React.FC<DiagnosesRowProps> = ({ userId, getUserDiagnoses })
             className="w-full flex items-center gap-2 px-6 py-2 text-xs text-[var(--ag-text-muted)] hover:bg-[var(--ag-bg)] transition-colors"
           >
             {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {loading ? 'Loading diagnoses…' : `${open ? 'Hide' : 'View'} AI diagnoses`}
+            {loading ? 'Loading user details...' : `${open ? 'Hide' : 'View'} farm details and uploads`}
           </button>
         </td>
       </tr>
       {open && (
         <tr>
           <td colSpan={4} className="px-6 pb-4 bg-[var(--ag-bg)]">
-            {diagnoses.length === 0 ? (
-              <p className="text-xs text-[var(--ag-text-muted)] italic">No diagnoses recorded.</p>
+            {!details ? (
+              <p className="text-xs text-[var(--ag-text-muted)] italic">No user details available.</p>
             ) : (
-              <div className="space-y-2 max-h-56 overflow-y-auto">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <StatusChip tone="forest">Farms: {details.farms.length}</StatusChip>
+                  <StatusChip tone="blue">Plants: {details.standalonePlants.length}</StatusChip>
+                  <StatusChip tone="amber">Diagnoses: {diagnoses.length}</StatusChip>
+                  <StatusChip tone="red">Transactions: {transactions.length}</StatusChip>
+                </div>
+                {details.farms.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {details.farms.map((farm) => (
+                      <div key={String(farm.id)} className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-surface)] p-3">
+                        <p className="text-sm font-bold text-[var(--ag-text)]">{String(farm.name || 'Unnamed farm')}</p>
+                        <p className="text-xs text-[var(--ag-text-muted)]">
+                          {String(farm.location || 'No location')} · {String(farm.area || '-')} {String(farm.area_unit || '')} · {String(farm.soil_type || 'No soil type')}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--ag-text-soft)]">
+                          Coordinates: {farm.coordinates?.length || 0} · Cycles: {farm.cycles?.length || 0}
+                        </p>
+                        {(farm.cycles || []).slice(0, 3).map((cycle) => (
+                          <div key={String(cycle.id)} className="mt-2 rounded-lg bg-[var(--ag-bg)] px-3 py-2 text-xs text-[var(--ag-text-muted)]">
+                            <span className="font-semibold text-[var(--ag-text)]">{String(cycle.crop || 'Crop')}</span>
+                            {' '}· {String(cycle.season || 'season')} · Plants: {cycle.plants?.length || 0}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--ag-text-muted)] italic">No farms uploaded by this user.</p>
+                )}
                 {diagnoses.map((d, i) => (
                   <div key={i} className="flex items-start gap-3 rounded-xl border border-[var(--ag-border)] bg-[var(--ag-surface)] p-3">
                     {d.image_url && (
@@ -258,6 +292,92 @@ const CreateNewsModal: React.FC<CreateNewsModalProps> = ({ onClose, onCreated })
 };
 
 // ─── Edit/Create Growth Guide Modal ─────────────────────────
+interface CreateDiseaseModalProps { onClose: () => void; onCreated: (disease: DiseaseInfo) => void; }
+const CreateDiseaseModal: React.FC<CreateDiseaseModalProps> = ({ onClose, onCreated }) => {
+  const [form, setForm] = useState({
+    name: '',
+    scientificName: '',
+    category: 'plant-disease',
+    imageUrl: '',
+    description: '',
+    symptoms: '',
+    treatment: '',
+    prevention: '',
+    hosts: '',
+    language: 'ar',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const updateField = (field: keyof typeof form, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const splitLines = (text: string) => text.split(/\r?\n|,/).map((entry) => entry.trim()).filter(Boolean);
+
+  const saveDisease = async () => {
+    if (!form.name.trim() || !form.description.trim()) {
+      setErr('Name and description are required.');
+      return;
+    }
+    setSaving(true);
+    setErr('');
+    try {
+      const createdDisease = await diseaseLibraryApi.create({
+        name: form.name.trim(),
+        scientificName: form.scientificName.trim() || undefined,
+        category: form.category.trim() || 'plant-disease',
+        imageUrl: form.imageUrl.trim() || undefined,
+        description: form.description.trim(),
+        symptoms: splitLines(form.symptoms),
+        treatment: splitLines(form.treatment),
+        prevention: splitLines(form.prevention),
+        hosts: splitLines(form.hosts),
+        language: form.language,
+      });
+      onCreated(createdDisease);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to create disease entry');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 backdrop-blur-sm py-10 px-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-[var(--ag-surface)] p-6 shadow-2xl border border-[var(--ag-border)]">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-lg text-[var(--ag-text)] flex items-center gap-2"><Stethoscope size={18} /> Add Disease</h3>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-[var(--ag-bg)] text-[var(--ag-text-soft)]"><X size={18} /></button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <input value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="Disease name" className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <input value={form.scientificName} onChange={(e) => updateField('scientificName', e.target.value)} placeholder="Scientific name" className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <input value={form.category} onChange={(e) => updateField('category', e.target.value)} placeholder="Category" className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <select value={form.language} onChange={(e) => updateField('language', e.target.value)} className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]">
+            <option value="ar">Arabic</option>
+            <option value="en">English</option>
+          </select>
+          <input value={form.imageUrl} onChange={(e) => updateField('imageUrl', e.target.value)} placeholder="Image URL" className="md:col-span-2 rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <textarea value={form.description} onChange={(e) => updateField('description', e.target.value)} placeholder="Description" rows={3} className="md:col-span-2 rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <textarea value={form.symptoms} onChange={(e) => updateField('symptoms', e.target.value)} placeholder="Symptoms, one per line" rows={4} className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <textarea value={form.treatment} onChange={(e) => updateField('treatment', e.target.value)} placeholder="Treatment, one per line" rows={4} className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <textarea value={form.prevention} onChange={(e) => updateField('prevention', e.target.value)} placeholder="Prevention, one per line" rows={4} className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+          <textarea value={form.hosts} onChange={(e) => updateField('hosts', e.target.value)} placeholder="Hosts, one per line" rows={4} className="rounded-xl border border-[var(--ag-border)] bg-[var(--ag-bg)] px-3 py-2 text-sm text-[var(--ag-text)]" />
+        </div>
+        {err && <p className="mt-4 text-xs text-[var(--ag-red)]">{err}</p>}
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-[var(--ag-border)] py-2 text-sm text-[var(--ag-text-soft)] hover:bg-[var(--ag-bg)]">Cancel</button>
+          <button onClick={() => void saveDisease()} disabled={saving} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[var(--ag-green)] py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+            <Save size={14} />{saving ? 'Saving...' : 'Save Disease'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface EditGuideModalProps {
   target: Partial<GrowthGuidePlant> | null;
   onClose: () => void;
@@ -566,11 +686,11 @@ const EditGuideModal: React.FC<EditGuideModalProps> = ({ target, onClose, onSave
 };
 
 // ─── Main Dashboard ──────────────────────────────────────────
-type AdminTab = 'users' | 'posts' | 'news' | 'growth-guides' | 'disease-library' | 'scraping-center';
+type AdminTab = 'users' | 'posts' | 'news' | 'growth-guides' | 'disease-library' | 'messages' | 'scraping-center';
 
 export const AdminDashboard: React.FC = () => {
   const {
-    getAdminStats, getAllUsers, deleteUser, updateUserByAdmin, getUserDiagnoses,
+    getAdminStats, getAllUsers, deleteUser, updateUserByAdmin,
     getAllPostsAdmin, deleteAnyPost, user,
   } = useAuth();
   const { language } = useTranslation();
@@ -579,6 +699,7 @@ export const AdminDashboard: React.FC = () => {
   const [users,        setUsers]        = useState<User[]>([]);
   const [posts,        setPosts]        = useState<Record<string, unknown>[]>([]);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [isLoading,    setIsLoading]    = useState(true);
   const [activeTab,    setActiveTab]    = useState<AdminTab>('users');
   const [editTarget,   setEditTarget]   = useState<User | null>(null);
@@ -592,6 +713,9 @@ export const AdminDashboard: React.FC = () => {
   const [diseaseSyncInfo, setDiseaseSyncInfo] = useState('');
   const [isLoadingDiseases, setIsLoadingDiseases] = useState(false);
   const [viewingDisease, setViewingDisease] = useState<DiseaseInfo | null>(null);
+  const [showCreateDisease, setShowCreateDisease] = useState(false);
+  const [isDeletingDisease, setIsDeletingDisease] = useState('');
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   // News Sync
   const [isSyncingNews, setIsSyncingNews] = useState(false);
@@ -637,6 +761,17 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteDisease = async (diseaseId: string) => {
+    if (!window.confirm('Delete this disease entry?')) return;
+    setIsDeletingDisease(diseaseId);
+    try {
+      await diseaseLibraryApi.delete(diseaseId);
+      setDiseasesList((prev) => prev.filter((disease) => disease.id !== diseaseId));
+    } finally {
+      setIsDeletingDisease('');
+    }
+  };
+
   const filteredDiseases = useMemo(() => {
     return diseasesList.filter((d) => {
       const matchesSearch =
@@ -669,6 +804,13 @@ export const AdminDashboard: React.FC = () => {
   const loadNews = async () => {
     try { setNewsArticles(await newsApi.getAdminAll()); }
     catch (e) { console.error('Failed to load news:', e); }
+  };
+
+  const loadMessages = async () => {
+    setIsLoadingMessages(true);
+    try { setMessages(await adminApi.getContactMessages()); }
+    catch (e) { console.error('Failed to load contact messages:', e); }
+    finally { setIsLoadingMessages(false); }
   };
 
   const loadGuidesList = async (page = 1) => {
@@ -712,6 +854,10 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'disease-library') void loadDiseases();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'messages') void loadMessages();
   }, [activeTab]);
 
   useEffect(() => {
@@ -764,6 +910,18 @@ export const AdminDashboard: React.FC = () => {
       setNewsSyncInfo(e instanceof Error ? e.message : 'News sync failed.');
     } finally {
       setIsSyncingNews(false);
+    }
+  };
+
+  const handleUpdateMessageStatus = async (messageId: string, status: ContactMessage['status']) => {
+    const updatedMessage = await adminApi.updateContactMessage(messageId, status);
+    setMessages((prev) => prev.map((message) => (message.id === messageId ? updatedMessage : message)));
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (window.confirm('Delete this customer message?')) {
+      await adminApi.deleteContactMessage(messageId);
+      setMessages((prev) => prev.filter((message) => message.id !== messageId));
     }
   };
 
@@ -863,6 +1021,12 @@ export const AdminDashboard: React.FC = () => {
           onClose={() => setViewingDisease(null)}
         />
       )}
+      {showCreateDisease && (
+        <CreateDiseaseModal
+          onClose={() => setShowCreateDisease(false)}
+          onCreated={(disease) => setDiseasesList((prev) => [disease, ...prev])}
+        />
+      )}
 
       <PageHeader title="Admin Dashboard" subtitle="Enterprise oversight, user management, and platform health." imageUrl="/images/scene-dashboard.svg" />
 
@@ -881,7 +1045,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="admin-tab-bar flex gap-1 border-b border-[var(--ag-border)] overflow-x-auto">
-          {(['users', 'posts', 'news', 'growth-guides', 'disease-library', 'scraping-center'] as AdminTab[]).map((tab) => (
+          {(['users', 'posts', 'news', 'growth-guides', 'disease-library', 'messages', 'scraping-center'] as AdminTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -896,6 +1060,7 @@ export const AdminDashboard: React.FC = () => {
               {tab === 'news'   && <><Newspaper size={14} />{language === 'ar' ? `الأخبار (${newsArticles.length})` : `News (${newsArticles.length})`}</>}
               {tab === 'growth-guides' && <><Wheat size={14} />{language === 'ar' ? 'أدلة النمو' : 'Growth Guides'}</>}
               {tab === 'disease-library' && <><Stethoscope size={14} />{language === 'ar' ? 'مكتبة الأمراض' : 'Disease Library'}</>}
+              {tab === 'messages' && <><MessageSquare size={14} />{language === 'ar' ? `إدارة المسدجات (${messages.length})` : `Messages (${messages.length})`}</>}
               {tab === 'scraping-center' && <><Globe size={14} />{language === 'ar' ? 'مركز المزامنة' : 'Scraping Center'}</>}
             </button>
           ))}
@@ -982,7 +1147,7 @@ export const AdminDashboard: React.FC = () => {
                           </td>
                         </tr>
                         {platformUser.id && (
-                          <DiagnosesRow userId={platformUser.id} getUserDiagnoses={getUserDiagnoses} />
+                          <DiagnosesRow userId={platformUser.id} getUserDetails={adminApi.getUserDetails} />
                         )}
                       </React.Fragment>
                     ))}
@@ -1369,6 +1534,13 @@ export const AdminDashboard: React.FC = () => {
               />
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowCreateDisease(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition"
+                >
+                  <Plus size={15} />
+                  {language === 'ar' ? 'إضافة مرض' : 'Add Disease'}
+                </button>
+                <button
                   onClick={() => void handleSyncDiseases()}
                   disabled={isSyncingDiseases}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ag-green)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-60"
@@ -1455,12 +1627,22 @@ export const AdminDashboard: React.FC = () => {
                           </p>
                         </td>
                         <td className="text-right">
+                          <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => setViewingDisease(d)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--ag-surface-muted)] text-xs font-semibold text-[var(--ag-text)] border hover:bg-[var(--ag-bg)] transition"
                           >
                             {language === 'ar' ? "عرض التفاصيل" : "View Details"}
                           </button>
+                          <button
+                            onClick={() => void handleDeleteDisease(d.id)}
+                            disabled={isDeletingDisease === d.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 text-xs font-semibold text-[var(--ag-red)] border border-red-100 hover:bg-red-100 transition disabled:opacity-50"
+                          >
+                            <Trash2 size={13} />
+                            {language === 'ar' ? "حذف" : "Delete"}
+                          </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1477,6 +1659,81 @@ export const AdminDashboard: React.FC = () => {
                 }
                 icon={<Stethoscope size={22} />}
               />
+            )}
+          </SurfaceCard>
+        )}
+
+        {activeTab === 'messages' && (
+          <SurfaceCard className="ui-surface p-0 overflow-hidden">
+            <div className="border-b border-[var(--ag-border)] px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <SectionHeading
+                eyebrow={language === 'ar' ? "رسائل العملاء" : "Customer Inbox"}
+                title={language === 'ar' ? "إدارة المسدجات" : "Message Management"}
+                description={language === 'ar' ? "كل رسالة يرسلها العميل من صفحة اتصل بنا تظهر هنا." : "Messages submitted from the Contact Us form appear here."}
+              />
+              <button
+                onClick={() => void loadMessages()}
+                disabled={isLoadingMessages}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ag-green)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-60"
+              >
+                <RefreshCw size={15} className={isLoadingMessages ? 'animate-spin' : ''} />
+                {language === 'ar' ? 'تحديث' : 'Refresh'}
+              </button>
+            </div>
+            {isLoadingMessages ? (
+              <div className="p-8 text-center text-sm text-[var(--ag-text-muted)]">Loading messages...</div>
+            ) : messages.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="ui-table-shell">
+                  <thead>
+                    <tr>
+                      <th>{language === 'ar' ? 'العميل' : 'Customer'}</th>
+                      <th>{language === 'ar' ? 'الرسالة' : 'Message'}</th>
+                      <th>{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                      <th className="text-right">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {messages.map((message) => (
+                      <tr key={message.id}>
+                        <td>
+                          <p className="font-bold text-[var(--ag-text)]">{message.name}</p>
+                          <p className="text-xs text-[var(--ag-text-muted)]">{message.email}</p>
+                          <p className="text-xs text-[var(--ag-text-soft)]">
+                            {new Date(String(message.createdAt || message.created_at || Date.now())).toLocaleString()}
+                          </p>
+                        </td>
+                        <td>
+                          <div className="max-w-xl">
+                            <p className="text-sm font-semibold text-[var(--ag-text)]">{message.subject}</p>
+                            <p className="text-xs text-[var(--ag-text-muted)] whitespace-pre-wrap">{message.message}</p>
+                          </div>
+                        </td>
+                        <td>
+                          <StatusChip tone={message.status === 'new' ? 'amber' : message.status === 'read' ? 'blue' : 'forest'}>
+                            {message.status}
+                          </StatusChip>
+                        </td>
+                        <td className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => void handleUpdateMessageStatus(message.id, 'read')} className="inline-flex h-9 w-9 items-center justify-center rounded-full text-blue-600 hover:bg-blue-50" title="Mark read">
+                              <CheckCircle size={15} />
+                            </button>
+                            <button onClick={() => void handleUpdateMessageStatus(message.id, 'archived')} className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--ag-text-soft)] hover:bg-[var(--ag-bg)]" title="Archive">
+                              <Archive size={15} />
+                            </button>
+                            <button onClick={() => void handleDeleteMessage(message.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--ag-red)] hover:bg-red-50" title="Delete">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyPanel title={language === 'ar' ? "لا توجد رسائل" : "No messages yet"} description={language === 'ar' ? "رسائل صفحة اتصل بنا ستظهر هنا." : "Contact form submissions will appear here."} icon={<MessageSquare size={22} />} />
             )}
           </SurfaceCard>
         )}

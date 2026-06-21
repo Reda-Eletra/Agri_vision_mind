@@ -13,6 +13,7 @@ import type {
     SoilAnalysis,
     LiveAnalysisResult,
     GrowthAnalysisResult,
+    PlantAnalysisResult,
 } from '../types';
 import type { ChatMessage } from '../types';
 
@@ -137,6 +138,17 @@ const buildAgriculturalAssistantInstruction = (
 Respond in ${resolvedLanguage} unless the user explicitly asks for another language.
 Give calm, actionable, safety-aware farming guidance that works for both farmers and agronomists.
 If a diagnosis or recommendation is uncertain, say so clearly and avoid pretending certainty.
+
+Developer/Training Info Rule (CRITICAL):
+If the user asks who trained you (من الذي دربك), who created/developed you (من الذي طورك / من الذي صممك), who contributed to you (من الذي ساهم في تطويرك), or any questions asking about your creators, developers, or university origins, you MUST answer exactly with the following statement in Arabic:
+"تم تدريبي بواسطة طلاب كلية الحاسبات والمعلومات بجامعة قناة السويس، وهم:
+- أحمد عمر عادل
+- رضا محمد رمضان
+- أحمد جودة محمد
+- عمرو شريف عبد الرؤوف
+- كريم حسين عبد الفتاح
+- عمر عبد الفتاح"
+
 Current local date/time reference for this conversation:
 - Time zone: ${timeSnapshot.timeZone}
 - Local date: ${timeSnapshot.dateLabel}
@@ -228,6 +240,9 @@ const getErrorStatus = (error: unknown): number | null => {
 };
 
 const isRetryableGeminiError = (error: unknown): boolean => {
+    if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('cancel'))) {
+        return false;
+    }
     const status = getErrorStatus(error);
     if (status && RETRYABLE_GEMINI_STATUS_CODES.has(status)) return true;
 
@@ -321,12 +336,14 @@ const writeGeminiCache = <T,>(key: string, value: T): void => {
 
 export const diagnosePlant = async (
     images: { base64: string; mimeType: string }[],
-    language: string
-): Promise<PlantDiagnosis> => {
+    language: string,
+    signal?: AbortSignal
+): Promise<PlantAnalysisResult> => {
     const cacheKey = buildImageCacheKey('plant_diagnosis', language, images);
     const result = await withGeminiRetry(
         'Plant Doctor',
         async () => {
+        if (signal?.aborted) throw new Error('Request aborted');
         const parts = images.map(img => ({
             inlineData: { mimeType: img.mimeType, data: img.base64 },
         }));
@@ -336,7 +353,13 @@ export const diagnosePlant = async (
             contents: {
                 parts: [
                     ...parts,
-                    { text: `Analyze this plant image for diseases or health issues. Provide a diagnosis in ${safeLanguage(language)}. Return JSON matching the schema.` },
+                    { text: `Analyze this plant image for diseases or health issues. Provide a diagnosis in ${safeLanguage(language)}.
+You must first determine if there is a clear plant in the image.
+Rule 1: If there is no plant, or if the image contains a person, wall, furniture, or anything non-agricultural, set "isPlantDetected" to false. Do not rely solely on the presence of the color green, as non-plant objects can be green.
+Rule 2: If the image is too dark, blurry, shaky, or the plant is too far away, set "isPlantDetected" to false and provide a helpful message in "message" asking the user to improve lighting, stabilize the camera, or get closer.
+Rule 3: If a clear plant is detected, set "isPlantDetected" to true, "confidence" to your confidence score (0.0 to 1.0), and populate the "diagnosis" object with all the requested details.
+
+Return JSON matching the schema. If isPlantDetected is false, "diagnosis" must be null, and "message" must explain why (e.g. in Arabic: "لم يتم اكتشاف نبات. وجّه الكاميرا نحو نبات واضح ثم حاول مرة أخرى." or "الصورة مظلمة للغاية. يرجى تحسين الإضاءة." etc.).` },
                 ],
             },
             config: {
@@ -344,59 +367,113 @@ export const diagnosePlant = async (
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        plantName:         { type: Type.STRING },
-                        isHealthy:         { type: Type.BOOLEAN },
-                        healthPercentage:  { type: Type.NUMBER },
-                        diseaseName:       { type: Type.STRING },
-                        cause:             { type: Type.STRING },
-                        symptoms:          { type: Type.ARRAY, items: { type: Type.STRING } },
-                        treatment:         { type: Type.ARRAY, items: { type: Type.STRING } },
-                        recommendedProducts: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    productName:  { type: Type.STRING },
-                                    description:  { type: Type.STRING },
-                                    type:         { type: Type.STRING },
+                        isPlantDetected: { type: Type.BOOLEAN },
+                        confidence:      { type: Type.NUMBER },
+                        message:         { type: Type.STRING },
+                        diagnosis: {
+                            type: Type.OBJECT,
+                            nullable: true,
+                            properties: {
+                                plantName:         { type: Type.STRING },
+                                isHealthy:         { type: Type.BOOLEAN },
+                                healthPercentage:  { type: Type.NUMBER },
+                                diseaseName:       { type: Type.STRING },
+                                cause:             { type: Type.STRING },
+                                symptoms:          { type: Type.ARRAY, items: { type: Type.STRING } },
+                                treatment:         { type: Type.ARRAY, items: { type: Type.STRING } },
+                                recommendedProducts: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            productName:  { type: Type.STRING },
+                                            description:  { type: Type.STRING },
+                                            type:         { type: Type.STRING },
+                                        },
+                                    },
+                                },
+                                prevention:        { type: Type.ARRAY, items: { type: Type.STRING } },
+                                confidenceScore:   { type: Type.NUMBER },
+                                visualCues:        { type: Type.STRING },
+                                growthStage:       { type: Type.STRING },
+                                growthStageReasoning: { type: Type.STRING },
+                                humanConsumptionAdvisory: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        isEdible:      { type: Type.BOOLEAN },
+                                        safetyStatus:  { type: Type.STRING, enum: ['safe', 'caution', 'toxic', 'unknown'] },
+                                        title:         { type: Type.STRING },
+                                        summary:       { type: Type.STRING },
+                                        symptoms:      { type: Type.ARRAY, items: { type: Type.STRING } },
+                                        severity:      { type: Type.STRING },
+                                        whatToDo:      { type: Type.STRING },
+                                    },
+                                },
+                                secondaryDiagnosis: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        diseaseName:    { type: Type.STRING },
+                                        confidenceScore: { type: Type.NUMBER },
+                                        reasoning:      { type: Type.STRING },
+                                    },
+                                    nullable: true,
                                 },
                             },
                         },
-                        prevention:        { type: Type.ARRAY, items: { type: Type.STRING } },
-                        confidenceScore:   { type: Type.NUMBER },
-                        visualCues:        { type: Type.STRING },
-                        growthStage:       { type: Type.STRING },
-                        growthStageReasoning: { type: Type.STRING },
-                        humanConsumptionAdvisory: {
-                            type: Type.OBJECT,
-                            properties: {
-                                isEdible:      { type: Type.BOOLEAN },
-                                safetyStatus:  { type: Type.STRING, enum: ['safe', 'caution', 'toxic', 'unknown'] },
-                                title:         { type: Type.STRING },
-                                summary:       { type: Type.STRING },
-                                symptoms:      { type: Type.ARRAY, items: { type: Type.STRING } },
-                                severity:      { type: Type.STRING },
-                                whatToDo:      { type: Type.STRING },
-                            },
-                        },
-                        secondaryDiagnosis: {
-                            type: Type.OBJECT,
-                            properties: {
-                                diseaseName:    { type: Type.STRING },
-                                confidenceScore: { type: Type.NUMBER },
-                                reasoning:      { type: Type.STRING },
-                            },
-                            nullable: true,
-                        },
                     },
                 },
-            },
+                abortSignal: signal,
+                signal: signal,
+            } as any,
         });
 
+        if (signal?.aborted) throw new Error('Request aborted');
         if (!response.text) throw new Error('No response from AI');
-        return JSON.parse(response.text) as PlantDiagnosis;
+        const parsed = JSON.parse(response.text);
+        
+        return {
+            isPlantDetected: parsed.isPlantDetected ?? false,
+            confidence: parsed.confidence ?? 0,
+            message: parsed.message ?? '',
+            diagnosis: parsed.diagnosis ? {
+                plantName: parsed.diagnosis.plantName ?? 'Unknown Plant',
+                isHealthy: parsed.diagnosis.isHealthy ?? true,
+                healthPercentage: parsed.diagnosis.healthPercentage ?? 100,
+                diseaseName: parsed.diagnosis.diseaseName ?? 'None',
+                cause: parsed.diagnosis.cause ?? 'N/A',
+                symptoms: parsed.diagnosis.symptoms ?? [],
+                treatment: parsed.diagnosis.treatment ?? [],
+                recommendedProducts: parsed.diagnosis.recommendedProducts ?? [],
+                prevention: parsed.diagnosis.prevention ?? [],
+                confidenceScore: parsed.diagnosis.confidenceScore ?? 1,
+                visualCues: parsed.diagnosis.visualCues ?? '',
+                growthStage: parsed.diagnosis.growthStage ?? '',
+                growthStageReasoning: parsed.diagnosis.growthStageReasoning ?? '',
+                humanConsumptionAdvisory: parsed.diagnosis.humanConsumptionAdvisory ?? {
+                    isEdible: true,
+                    safetyStatus: 'safe',
+                    title: 'Safe',
+                    summary: 'No issues found.'
+                },
+                secondaryDiagnosis: parsed.diagnosis.secondaryDiagnosis ?? null,
+            } : null
+        };
         },
-        () => readGeminiCache<PlantDiagnosis>(cacheKey)
+        () => {
+            const cached = readGeminiCache<any>(cacheKey);
+            if (cached) {
+                if (cached.plantName !== undefined) {
+                    return {
+                        isPlantDetected: true,
+                        confidence: cached.confidenceScore ?? 0.95,
+                        message: '',
+                        diagnosis: cached
+                    };
+                }
+                return cached;
+            }
+            return null;
+        }
     );
     writeGeminiCache(cacheKey, result);
     return result;
@@ -481,17 +558,26 @@ export const analyzeRecoveryProgress = async (
     });
 };
 
-export const analyzeRealTimeFrame = async (base64Image: string): Promise<LiveAnalysisResult> => {
+export const analyzeRealTimeFrame = async (
+    base64Image: string,
+    signal?: AbortSignal
+): Promise<LiveAnalysisResult> => {
     const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
     if (!imageData) throw new Error('Invalid frame data');
 
     return withGeminiRetry('Plant Doctor Live Monitor', async () => {
+        if (signal?.aborted) throw new Error('Request aborted');
         const response = await getAiClient().models.generateContent({
             model: textModel,
             contents: {
                 parts: [
                     { inlineData: { mimeType: 'image/jpeg', data: imageData } },
-                    { text: `Analyze this video frame for plant diseases. Return JSON {detected: boolean, issues: string[], confidence: number, action: string}.` },
+                    { text: `Analyze this video frame for plant diseases.
+Rule 1: Determine if there is a clear plant in the image. If not (or if it's a person, wall, furniture, or anything non-agricultural), set "isPlantDetected" to false. Do not rely solely on the green color.
+Rule 2: If the image is dark, blurry, shaky, or the plant is too far away, set "isPlantDetected" to false and provide a helpful message in "message" asking the user to improve lighting, stabilize the camera, or get closer.
+Rule 3: If a clear plant is detected, set "isPlantDetected" to true, and in the "diagnosis" object set "detected" to true if issues/diseases are found (otherwise false), and list "issues" and the suggested "action".
+
+Return JSON matching the schema. If isPlantDetected is false, "diagnosis" must be null, and "message" must explain why.` },
                 ],
             },
             config: {
@@ -499,17 +585,48 @@ export const analyzeRealTimeFrame = async (base64Image: string): Promise<LiveAna
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        detected:   { type: Type.BOOLEAN },
-                        issues:     { type: Type.ARRAY, items: { type: Type.STRING } },
-                        confidence: { type: Type.NUMBER },
-                        action:     { type: Type.STRING },
+                        isPlantDetected: { type: Type.BOOLEAN },
+                        confidence:      { type: Type.NUMBER },
+                        message:         { type: Type.STRING },
+                        diagnosis: {
+                            type: Type.OBJECT,
+                            nullable: true,
+                            properties: {
+                                detected:   { type: Type.BOOLEAN },
+                                issues:     { type: Type.ARRAY, items: { type: Type.STRING } },
+                                action:     { type: Type.STRING },
+                            },
+                        },
                     },
                 },
-            },
+                abortSignal: signal,
+                signal: signal,
+            } as any,
         });
 
+        if (signal?.aborted) throw new Error('Request aborted');
         if (!response.text) throw new Error('Frame analysis failed');
-        return JSON.parse(response.text) as LiveAnalysisResult;
+        try {
+            const parsed = JSON.parse(response.text);
+            return {
+                isPlantDetected: parsed.isPlantDetected ?? false,
+                confidence: parsed.confidence ?? 0,
+                message: parsed.message ?? '',
+                detected: parsed.diagnosis?.detected ?? false,
+                issues: parsed.diagnosis?.issues ?? [],
+                action: parsed.diagnosis?.action ?? '',
+            };
+        } catch (e) {
+            console.error("Failed to parse live analysis JSON", e);
+            return {
+                isPlantDetected: false,
+                confidence: 0,
+                message: 'Failed to parse live analysis results.',
+                detected: false,
+                issues: [],
+                action: '',
+            };
+        }
     });
 };
 

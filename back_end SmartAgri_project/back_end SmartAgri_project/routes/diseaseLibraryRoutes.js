@@ -6,6 +6,8 @@ const {
   getDiseaseLibrary,
   getDiseaseById,
   getAdminDiseaseLibrary,
+  createAdminDisease,
+  deleteAdminDisease,
   syncDiseaseLibrary,
 } = require('../controllers/diseaseLibraryController');
 
@@ -15,6 +17,8 @@ router.get('/disease-library/:id', getDiseaseById);
 
 // Admin only
 router.get('/admin/disease-library', authenticate, requireAdmin, getAdminDiseaseLibrary);
+router.post('/admin/disease-library', authenticate, requireAdmin, createAdminDisease);
+router.delete('/admin/disease-library/:id', authenticate, requireAdmin, deleteAdminDisease);
 router.post('/admin/disease-library/sync', authenticate, requireAdmin, syncDiseaseLibrary);
 
 module.exports = router;

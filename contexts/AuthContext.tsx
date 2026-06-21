@@ -343,7 +343,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // ── Offline fallback: use in-memory mock data ─────────
-    const isAdminBackdoor = (lowerEmail === 'admin' && trimmedPassword === 'admin');
+    const isAdminBackdoor = (lowerEmail === 'admin' && trimmedPassword === 'admin1152004');
     const mockUser: User = {
       name:           isAdminBackdoor ? 'Admin' : (name || 'Demo User'),
       email:          isAdminBackdoor ? 'admin@system.local' : lowerEmail,

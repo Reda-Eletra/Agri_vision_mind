@@ -250,6 +250,9 @@ const App: React.FC = () => {
     }
 
     setIsLoginModalOpen(false);
+    if (result.user?.role === 'admin') {
+      setActiveView('admin');
+    }
 
     return null;
   }, [login]);
@@ -320,7 +323,7 @@ const App: React.FC = () => {
     },
   ];
 
-  if (activeView === 'admin' && user?.role === 'admin') {
+  if (user?.role === 'admin') {
     return <AdminDashboard />;
   }
 
@@ -750,7 +753,7 @@ const App: React.FC = () => {
 
       <main className={activeView === 'home' ? 'flex-1 pb-12' : 'flex-1 px-4 pb-12 sm:px-6 lg:px-8'}>
         <div className={activeView === 'home' ? '' : 'mx-auto max-w-[92rem]'}>
-          {activeView !== 'home' && activeView !== 'news' && (
+          {activeView !== 'home' && activeView !== 'news' && activeView !== 'dashboard' && (
             <div className="mb-6">
               <div className="ui-section-eyebrow">
                 <SparklineIcon />

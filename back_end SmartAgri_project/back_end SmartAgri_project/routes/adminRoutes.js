@@ -8,6 +8,7 @@ const {
   updateUser,
   deleteUser,
   getUserDiagnoses,
+  getUserDetails,
   getAllPosts,
   adminDeletePost,
   getAdminGrowthGuides,
@@ -24,6 +25,7 @@ router.get('/admin/users',                   authenticate, requireAdmin, getUser
 router.patch('/admin/users/:id',             authenticate, requireAdmin, updateUser);
 router.delete('/admin/users/:id',            authenticate, requireAdmin, deleteUser);
 router.get('/admin/users/:id/diagnoses',     authenticate, requireAdmin, getUserDiagnoses);
+router.get('/admin/users/:id/details',       authenticate, requireAdmin, getUserDetails);
 router.get('/admin/posts',                   authenticate, requireAdmin, getAllPosts);
 router.delete('/admin/posts/:id',            authenticate, requireAdmin, adminDeletePost);
 

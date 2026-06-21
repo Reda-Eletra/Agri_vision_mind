@@ -29,6 +29,8 @@ import type {
   FarmResponse,
   CreateFarmInput,
   UpdateFarmInput,
+  ContactMessage,
+  AdminUserDetails,
 } from "../types";
 
 // ─── Generic helper ──────────────────────────────────────────
@@ -469,6 +471,15 @@ export const adminApi = {
     return res.data;
   },
 
+  getUserDetails: async (userId: string): Promise<AdminUserDetails> => {
+    const res = await authFetch<ApiItem<AdminUserDetails>>(
+      `/admin/users/${userId}/details`,
+      {},
+      tok()
+    );
+    return res.data;
+  },
+
   getAllPosts: async (): Promise<Record<string, unknown>[]> => {
     const res = await authFetch<ApiList<Record<string, unknown>>>(
       "/admin/posts",
@@ -553,6 +564,30 @@ export const adminApi = {
       tok()
     );
     return res.data;
+  },
+
+  getContactMessages: async (): Promise<ContactMessage[]> => {
+    const res = await authFetch<ApiList<ContactMessage>>("/admin/contact-messages", {}, tok());
+    return res.data;
+  },
+
+  updateContactMessage: async (
+    messageId: string,
+    status: ContactMessage["status"]
+  ): Promise<ContactMessage> => {
+    const res = await authFetch<ApiItem<ContactMessage>>(
+      `/admin/contact-messages/${messageId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      },
+      tok()
+    );
+    return res.data;
+  },
+
+  deleteContactMessage: async (messageId: string): Promise<void> => {
+    await authFetch(`/admin/contact-messages/${messageId}`, { method: "DELETE" }, tok());
   },
 };
 
@@ -739,6 +774,25 @@ export const diseaseLibraryApi = {
     }));
   },
 
+  create: async (payload: Partial<DiseaseInfo>): Promise<DiseaseInfo> => {
+    const res = await authFetch<ApiItem<DiseaseInfo>>(
+      "/admin/disease-library",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      tok()
+    );
+    return {
+      ...res.data,
+      imageUrl: toAbsoluteAssetUrl(res.data.imageUrl) || undefined,
+    };
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await authFetch(`/admin/disease-library/${id}`, { method: "DELETE" }, tok());
+  },
+
   sync: async (): Promise<{
     scanned: number;
     created: number;
@@ -786,6 +840,25 @@ export const diseaseLibraryApi = {
 // ─────────────────────────────────────────────────────────────
 
 /** Map backend snake_case cycle row → FarmCycle */
+export const contactApi = {
+  createMessage: async (payload: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<ContactMessage> => {
+    const res = await authFetch<ApiItem<ContactMessage>>(
+      "/contact-messages",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      null
+    );
+    return res.data;
+  },
+};
+
 const mapCycle = (row: Record<string, unknown>): FarmCycle => ({
   id: row.id as string,
   farmId: row.farm_id as string,

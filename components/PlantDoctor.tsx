@@ -11,6 +11,7 @@ import { useConfig } from '../contexts/ConfigContext';
 import { generateDiagnosisPdf } from '../services/pdfService';
 import { RealTimeMonitor } from './RealTimeMonitor';
 import { cycleApi, cyclePlantApi, cycleTaskApi } from '../services/apiService';
+import { stopMediaStream } from '../services/cameraService';
 
 // --- ICONS ---
 const CameraIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10 text-gray-400 group-hover:text-brand-green transition-colors"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>;
@@ -165,9 +166,10 @@ const CameraView: React.FC<{
   const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isStreamActive, setIsStreamActive] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -176,13 +178,15 @@ const CameraView: React.FC<{
           video: { facingMode: 'environment' },
           audio: false,
         });
-        setStream(mediaStream);
+        streamRef.current = mediaStream;
+        setIsStreamActive(true);
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
         }
       } catch (err) {
         console.error("Camera access denied:", err);
         setError(t('plantDoctor.cameraError'));
+        setIsStreamActive(false);
       }
     };
     if (!capturedImage) {
@@ -190,7 +194,9 @@ const CameraView: React.FC<{
     }
 
     return () => {
-      stream?.getTracks().forEach(track => track.stop());
+      stopMediaStream(streamRef.current, videoRef.current);
+      streamRef.current = null;
+      setIsStreamActive(false);
     };
   }, [capturedImage, t]);
 
@@ -204,7 +210,9 @@ const CameraView: React.FC<{
       context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       setCapturedImage(dataUrl);
-      stream?.getTracks().forEach(track => track.stop()); // Stop stream after capture
+      stopMediaStream(streamRef.current, videoRef.current);
+      streamRef.current = null;
+      setIsStreamActive(false);
     }
   };
 
@@ -247,7 +255,7 @@ const CameraView: React.FC<{
                         <button onClick={handleUsePhoto} className="px-6 py-2 bg-brand-green text-white font-semibold rounded-lg hover:bg-brand-green-dark transition-colors">Use Photo</button>
                     </>
                 ) : (
-                    <button onClick={handleCapture} disabled={!stream} className="w-16 h-16 bg-white rounded-full border-4 border-brand-green disabled:bg-gray-400 disabled:border-gray-500 ring-4 ring-brand-green/30"></button>
+                    <button onClick={handleCapture} disabled={!isStreamActive} className="w-16 h-16 bg-white rounded-full border-4 border-brand-green disabled:bg-gray-400 disabled:border-gray-500 ring-4 ring-brand-green/30"></button>
                 )}
             </div>
         </div>
@@ -324,7 +332,15 @@ export const PlantDoctor: React.FC<PlantDoctorProps> = ({ onTrackPlantSuccess })
       } else {
         const imagePayload = imagesData.map(({ base64, mimeType }) => ({ base64, mimeType }));
         const result = await diagnosePlant(imagePayload, language);
-        setDiagnosis(result);
+        if (result.isPlantDetected && result.diagnosis) {
+          setDiagnosis(result.diagnosis);
+          setError(null);
+        } else {
+          setDiagnosis(null);
+          setError(result.message || (language === 'ar' 
+            ? 'لم يتم اكتشاف نبات. وجّه الكاميرا نحو نبات واضح ثم حاول مرة أخرى.' 
+            : 'No plant detected. Point the camera at a clear plant and try again.'));
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('plantDoctor.error'));
