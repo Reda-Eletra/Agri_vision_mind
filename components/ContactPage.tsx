@@ -1,5 +1,4 @@
 
-// ... existing imports ...
 import React, { useState } from 'react';
 import { useTranslation } from '../contexts/LanguageContext';
 import { contactApi } from '../services/apiService';
@@ -42,71 +41,81 @@ export const ContactPage: React.FC = () => {
     return (
         <div className="animate-fade-in pb-12">
             <div className="container mx-auto px-4 pt-8 relative z-10">
-                <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
-                    <div className="grid md:grid-cols-2">
-                        
-                        {/* Left Side: Contact Info & 3D Image */}
-                        <div className="p-8 md:p-12 bg-brand-green-darker text-white relative overflow-hidden flex flex-col justify-between">
-                            {/* Decorative Background */}
-                            <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                                <div className="absolute right-0 top-0 w-64 h-64 bg-white rounded-full filter blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-                                <div className="absolute left-0 bottom-0 w-64 h-64 bg-brand-green rounded-full filter blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
-                            </div>
-
-                            <div className="relative z-10 space-y-8">
+                <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-[#07140f] shadow-[0_30px_90px_rgba(8,35,24,0.28)]">
+                    <img
+                        src="/images/contact-smart-farm-support.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 h-full w-full object-cover opacity-75"
+                    />
+                    <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,18,12,0.94),rgba(7,28,17,0.78)_44%,rgba(246,250,245,0.92)_44%,rgba(246,250,245,0.98))] dark:bg-[linear-gradient(90deg,rgba(4,18,12,0.94),rgba(7,28,17,0.82)_44%,rgba(9,22,16,0.92)_44%,rgba(9,22,16,0.98))]" />
+                    <div className="relative grid min-h-[38rem] lg:grid-cols-[0.95fr_1.05fr]">
+                        <div className="flex flex-col justify-between p-8 text-white md:p-12">
+                            <div className="max-w-md space-y-8">
                                 <div>
-                                    <h3 className="text-2xl font-bold mb-4">{t('contactPage.getInTouch')}</h3>
-                                    <p className="text-gray-300 leading-relaxed">{t('contactPage.description')}</p>
+                                    <p className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.18em] text-green-100 backdrop-blur">
+                                        Agricultural Vision Mind
+                                    </p>
+                                    <h2 className="mt-6 text-3xl font-black leading-tight md:text-5xl">
+                                        {t('contactPage.getInTouch')}
+                                    </h2>
+                                    <p className="mt-4 text-base leading-8 text-green-50/85 md:text-lg">{t('contactPage.description')}</p>
                                 </div>
 
                                 <div className="space-y-6">
                                     <div className="flex items-start gap-4">
-                                        <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                                        <div className="rounded-2xl border border-white/15 bg-white/12 p-3 backdrop-blur-sm">
                                             <MailIcon />
                                         </div>
                                         <div>
-                                            <h4 className="font-semibold text-sm opacity-70">{t('contactPage.email')}</h4>
+                                            <h4 className="text-sm font-semibold text-green-100/70">{t('contactPage.email')}</h4>
                                             <p className="font-medium">ahmadomaradel@gmail.com</p>
                                         </div>
                                     </div>
                                     
                                     <div className="flex items-start gap-4">
-                                        <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                                        <div className="rounded-2xl border border-white/15 bg-white/12 p-3 backdrop-blur-sm">
                                             <MapPinIcon />
                                         </div>
                                         <div>
-                                            <h4 className="font-semibold text-sm opacity-70">{t('contactPage.location')}</h4>
+                                            <h4 className="text-sm font-semibold text-green-100/70">{t('contactPage.location')}</h4>
                                             <p className="font-medium">{t('contactPage.locationValue')}</p>
                                         </div>
                                     </div>
 
                                      <div className="flex items-start gap-4">
-                                        <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                                        <div className="rounded-2xl border border-white/15 bg-white/12 p-3 backdrop-blur-sm">
                                             <PhoneIcon />
                                         </div>
                                         <div>
-                                            <h4 className="font-semibold text-sm opacity-70">{t('contactPage.phone')}</h4>
+                                            <h4 className="text-sm font-semibold text-green-100/70">{t('contactPage.phone')}</h4>
                                             <p className="font-medium">+1 (555) 123-4567</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 3D Image Effect */}
-                            <div className="relative mt-12 perspective-container h-64 hidden md:block">
-                                <img 
-                                    src="/images/scene-contact.svg" 
-                                    alt="Contact Support" 
-                                    className="w-full h-full object-cover image-3d-effect shadow-2xl"
-                                />
+                            <div className="mt-10 grid grid-cols-3 gap-3 text-center text-green-50">
+                                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                                    <strong className="block text-2xl">24/7</strong>
+                                    <span className="text-xs text-green-100/75">support</span>
+                                </div>
+                                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                                    <strong className="block text-2xl">AI</strong>
+                                    <span className="text-xs text-green-100/75">routing</span>
+                                </div>
+                                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                                    <strong className="block text-2xl">Farm</strong>
+                                    <span className="text-xs text-green-100/75">care</span>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Right Side: Form */}
-                        <div className="p-8 md:p-12 bg-white dark:bg-gray-800">
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">{t('contactPage.sendMessage')}</h3>
+                        <div className="flex items-center p-6 md:p-10">
+                            <div className="w-full rounded-[1.5rem] border border-black/5 bg-white/90 p-6 shadow-[0_22px_60px_rgba(8,35,24,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0b1812]/88 md:p-8">
+                                <h3 className="mb-6 text-2xl font-black text-gray-900 dark:text-white">{t('contactPage.sendMessage')}</h3>
                             
-                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('contactPage.form.name')}</label>
@@ -176,7 +185,8 @@ export const ContactPage: React.FC = () => {
                                     <p className="text-sm text-center font-semibold text-brand-green dark:text-green-300">{submitStatus}</p>
                                 )}
                                 <p className="text-xs text-center text-gray-500 mt-4">{t('contactPage.form.disclaimer')}</p>
-                            </form>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>

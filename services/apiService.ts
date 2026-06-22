@@ -1233,6 +1233,7 @@ export const storeApi = {
     search?: string;
     category?: string;
     source?: "all" | "harraz" | "orkida";
+    language?: string;
   }): Promise<{
     data: StoreProduct[];
     pagination: {
@@ -1252,6 +1253,7 @@ export const storeApi = {
     if (params.search) query.set("search", params.search);
     if (params.category) query.set("category", params.category);
     if (params.source) query.set("source", params.source);
+    if (params.language) query.set("lang", params.language);
     return authFetch(`/store/products?${query.toString()}`, {}, tok());
   },
 

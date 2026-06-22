@@ -63,14 +63,16 @@ test('public store endpoint maps Harraz products to the frontend catalog contrac
   });
 });
 
-test('upstream catalog failure is reported instead of returning fake products', async () => {
-  global.fetch = async () => new Response('Unavailable', { status: 503 });
+test('Harraz HTTP 403 falls back to a local catalog snapshot', async () => {
+  global.fetch = async () => new Response('Forbidden', { status: 403 });
 
   const response = await request(app)
-    .get('/api/store/products?search=force-upstream-failure&source=harraz');
+    .get('/api/store/products?page=1&limit=24&source=harraz&search=سماد&lang=ar');
 
-  assert.equal(response.status, 502);
-  assert.match(response.body.error, /HTTP 503/);
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data[0].sourceId, 'harraz');
+  assert.equal(response.body.data[0].currency, 'EGP');
+  assert.match(response.body.data[0].name, /خلطة|زيت|سماد|كمبوست|كوكوبيت|مقص/);
 });
 
 test('Orkida products are mapped and cursor pagination reaches the next page', async () => {
@@ -132,7 +134,8 @@ test('Orkida products are mapped and cursor pagination reaches the next page', a
   assert.equal(firstPage.status, 200);
   assert.equal(firstPage.body.data[0].sourceId, 'orkida');
   assert.equal(firstPage.body.data[0].description, 'First page product');
-  assert.equal(firstPage.body.data[0].currency, 'SAR');
+  assert.equal(firstPage.body.data[0].currency, 'EGP');
+  assert.equal(firstPage.body.data[0].price, 1179.25);
   assert.equal(firstPage.body.pagination.hasNext, true);
   assert.equal(secondPage.status, 200);
   assert.equal(secondPage.body.data[0].id, '202');

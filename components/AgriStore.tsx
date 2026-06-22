@@ -10,30 +10,46 @@ type StoreSource = 'all' | 'harraz' | 'orkida';
 
 const recommendedStoreSolutions = [
   {
-    title: 'Copper fungicide',
-    relation: 'Related problem: early/late blight',
-    description: 'Useful when Plant Doctor reports fungal leaf spots or blight pressure.',
+    title: { en: 'Copper fungicide', ar: 'مبيد فطري نحاسي' },
+    relation: { en: 'Related problem: early/late blight', ar: 'مرتبط بالندوة المبكرة والمتأخرة' },
+    description: {
+      en: 'Useful when Plant Doctor reports fungal leaf spots or blight pressure.',
+      ar: 'مفيد عندما يرصد طبيب النبات بقعًا فطرية أو ضغط إصابة بالندوة.',
+    },
     query: 'copper fungicide agriculture',
   },
   {
-    title: 'Calcium potassium foliar feed',
-    relation: 'Related crop: tomato and cucumber',
-    description: 'Supports fruiting stages and helps reduce nutrition-stress symptoms.',
+    title: { en: 'Calcium potassium foliar feed', ar: 'تسميد ورقي كالسيوم بوتاسيوم' },
+    relation: { en: 'Related crop: tomato and cucumber', ar: 'مرتبط بالطماطم والخيار' },
+    description: {
+      en: 'Supports fruiting stages and helps reduce nutrition-stress symptoms.',
+      ar: 'يدعم مراحل الإثمار ويساعد في تقليل أعراض الإجهاد الغذائي.',
+    },
     query: 'calcium potassium foliar fertilizer',
   },
   {
-    title: 'Drip irrigation kit',
-    relation: 'Related task: irrigation',
-    description: 'Recommended for cycle plans that need stable moisture without wet leaves.',
+    title: { en: 'Drip irrigation kit', ar: 'طقم ري بالتنقيط' },
+    relation: { en: 'Related task: irrigation', ar: 'مرتبط بمهام الري' },
+    description: {
+      en: 'Recommended for cycle plans that need stable moisture without wet leaves.',
+      ar: 'مناسب لخطط الزراعة التي تحتاج رطوبة ثابتة بدون بلل الأوراق.',
+    },
     query: 'drip irrigation kit agriculture',
   },
   {
-    title: 'Soil pH test kit',
-    relation: 'Related issue: soil suitability',
-    description: 'Use before approving crop cycles when farm soil type or pH is uncertain.',
+    title: { en: 'Soil pH test kit', ar: 'عدة قياس حموضة التربة' },
+    relation: { en: 'Related issue: soil suitability', ar: 'مرتبطة بملاءمة التربة' },
+    description: {
+      en: 'Use before approving crop cycles when farm soil type or pH is uncertain.',
+      ar: 'تستخدم قبل اعتماد دورة الزراعة عند عدم وضوح نوع التربة أو درجة الحموضة.',
+    },
     query: 'soil ph test kit agriculture',
   },
 ];
+
+const localized = (value: { en: string; ar: string }, language: string) => (
+  language === 'ar' ? value.ar : value.en
+);
 
 const formatPrice = (product: StoreProduct, locale: string) =>
   new Intl.NumberFormat(locale, {
@@ -153,7 +169,7 @@ export const AgriStore: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    storeApi.getProducts({ page, limit: PAGE_SIZE, search, category, source })
+    storeApi.getProducts({ page, limit: PAGE_SIZE, search, category, source, language })
       .then((response) => {
         if (requestId !== requestSequence.current) return;
         setProducts(response.data);
@@ -174,7 +190,7 @@ export const AgriStore: React.FC = () => {
       .finally(() => {
         if (requestId === requestSequence.current) setLoading(false);
       });
-  }, [category, page, retryCount, search, source, t]);
+  }, [category, language, page, retryCount, search, source, t]);
 
   const resultLabel = useMemo(
     () => totalExact
@@ -221,8 +237,8 @@ export const AgriStore: React.FC = () => {
             aria-label={t('agriStore.sourceLabel')}
           >
             <option value="all">{t('agriStore.allStores')}</option>
-            <option value="harraz">Harraz Farm & Garden</option>
-            <option value="orkida">Orkida Agricultural Store</option>
+            <option value="harraz">{language === 'ar' ? 'هراز فارم آند جاردن' : 'Harraz Farm & Garden'}</option>
+            <option value="orkida">{language === 'ar' ? 'متجر أوركيدا الزراعي' : 'Orkida Agricultural Store'}</option>
           </select>
           <select
             value={category}
@@ -259,24 +275,26 @@ export const AgriStore: React.FC = () => {
 
       <SurfaceCard className="p-6">
         <SectionHeading
-          eyebrow="Recommended products"
-          title="Treatment and cycle-linked catalog"
-          description="These are quick recommendations tied to diagnoses, crop cycles, soil checks, and generated tasks. Buy links open external stores/search."
+          eyebrow={language === 'ar' ? 'ترشيحات مرتبطة بالمزرعة' : 'Recommended products'}
+          title={language === 'ar' ? 'كتالوج مرتبط بالتشخيص ودورات الزراعة' : 'Treatment and cycle-linked catalog'}
+          description={language === 'ar'
+            ? 'ترشيحات سريعة مرتبطة بالتشخيصات ودورات المحاصيل وفحوصات التربة والمهام المولدة. روابط الشراء تفتح متاجر أو بحثًا خارجيًا.'
+            : 'These are quick recommendations tied to diagnoses, crop cycles, soil checks, and generated tasks. Buy links open external stores/search.'}
           icon={<ShoppingBag size={15} />}
         />
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {recommendedStoreSolutions.map((item) => (
-            <article key={item.title} className="smart-store-recommendation">
+            <article key={item.query} className="smart-store-recommendation">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3>{item.title}</h3>
-                  <span>{item.relation}</span>
+                  <h3>{localized(item.title, language)}</h3>
+                  <span>{localized(item.relation, language)}</span>
                 </div>
                 <ShoppingBag size={18} />
               </div>
-              <p>{item.description}</p>
+              <p>{localized(item.description, language)}</p>
               <a href={`https://www.google.com/search?q=${encodeURIComponent(item.query)}`} target="_blank" rel="noreferrer">
-                View external options <ExternalLink size={13} />
+                {language === 'ar' ? 'عرض خيارات خارجية' : 'View external options'} <ExternalLink size={13} />
               </a>
             </article>
           ))}

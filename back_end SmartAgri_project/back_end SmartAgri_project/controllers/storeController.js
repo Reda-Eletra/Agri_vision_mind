@@ -11,10 +11,13 @@ const getStoreProducts = async (req, res, next) => {
   const search = String(req.query.search || '').trim().slice(0, 100);
   const requestedCategory = String(req.query.category || '').trim();
   const requestedSource = String(req.query.source || 'all').trim().toLowerCase();
+  const lang = String(req.query.lang || req.headers['accept-language'] || 'en').toLowerCase().startsWith('ar')
+    ? 'ar'
+    : 'en';
   const source = ['all', ...Object.keys(STORE_SOURCES)].includes(requestedSource)
     ? requestedSource
     : 'all';
-  const categoryMatch = requestedCategory.match(/^(harraz|orkida):(\d+)$/);
+  const categoryMatch = requestedCategory.match(/^(harraz|orkida):([a-z0-9-]+)$/i);
   const categorySource = categoryMatch?.[1] || '';
   const category = categoryMatch?.[2] || '';
   const effectiveSource = categorySource || source;
@@ -26,6 +29,7 @@ const getStoreProducts = async (req, res, next) => {
       search,
       category,
       source: effectiveSource,
+      lang,
     });
     res.json({
       data: catalog.products,

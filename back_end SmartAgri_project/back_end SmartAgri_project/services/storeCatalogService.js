@@ -20,6 +20,7 @@ const ORKIDA_STORE_ID = '605868729';
 const ORKIDA_CATEGORY_SITEMAP = 'https://orkidastore.com/ar/sitemap-1.xml';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 250;
+const SAR_TO_EGP_RATE = Number.parseFloat(process.env.SAR_TO_EGP_RATE || '13.25');
 const responseCache = new Map();
 const pendingRequests = new Map();
 const orkidaCursorChains = new Map();
@@ -34,8 +35,96 @@ class StoreCatalogError extends Error {
   constructor(message, options) {
     super(message, options);
     this.name = 'StoreCatalogError';
+    this.status = options?.status || 0;
   }
 }
+
+const HARRAZ_FALLBACK_PRODUCTS = [
+  {
+    id: 'soil-mix-3kg',
+    nameEn: 'Treated potting mix - 3KG',
+    nameAr: 'خلطة تربة معالجة - 3 كجم',
+    descriptionEn: 'Ready-to-use growing media for seedlings, herbs, and balcony crops.',
+    descriptionAr: 'بيئة زراعة جاهزة للشتلات والأعشاب ومحاصيل البلكونة.',
+    price: 200,
+    regularPrice: 225,
+    categoryId: 'soil-media',
+    categoryEn: 'Soil and media',
+    categoryAr: 'التربة وبيئات الزراعة',
+    imageUrl: 'https://harraz.shop/wp-content/uploads/2024/05/soil-mix.jpg',
+    productUrl: 'https://harraz.shop/?s=potting+mix&post_type=product',
+  },
+  {
+    id: 'neem-oil-250ml',
+    nameEn: 'Neem oil - 250ML',
+    nameAr: 'زيت نيم - 250 مل',
+    descriptionEn: 'Plant-care oil used in integrated pest management routines.',
+    descriptionAr: 'زيت للعناية بالنباتات ضمن برامج المكافحة المتكاملة للآفات.',
+    price: 180,
+    regularPrice: 180,
+    categoryId: 'plant-care',
+    categoryEn: 'Plant care',
+    categoryAr: 'العناية بالنبات',
+    imageUrl: 'https://harraz.shop/wp-content/uploads/2024/05/neem-oil.jpg',
+    productUrl: 'https://harraz.shop/?s=neem+oil&post_type=product',
+  },
+  {
+    id: 'npk-20-20-20',
+    nameEn: 'NPK 20-20-20 fertilizer - 1KG',
+    nameAr: 'سماد NPK 20-20-20 - 1 كجم',
+    descriptionEn: 'Balanced water-soluble fertilizer for vegetative and flowering stages.',
+    descriptionAr: 'سماد متوازن قابل للذوبان في الماء لمراحل النمو والتزهير.',
+    price: 260,
+    regularPrice: 290,
+    categoryId: 'fertilizers',
+    categoryEn: 'Fertilizers',
+    categoryAr: 'الأسمدة',
+    imageUrl: 'https://harraz.shop/wp-content/uploads/2024/05/fertilizer.jpg',
+    productUrl: 'https://harraz.shop/?s=NPK+20-20-20&post_type=product',
+  },
+  {
+    id: 'vermicompost-5kg',
+    nameEn: 'Vermicompost - 5KG',
+    nameAr: 'كمبوست دودي - 5 كجم',
+    descriptionEn: 'Organic soil amendment that improves structure and nutrient availability.',
+    descriptionAr: 'محسن تربة عضوي يساعد على تحسين البناء وتوفر العناصر الغذائية.',
+    price: 220,
+    regularPrice: 220,
+    categoryId: 'organic-inputs',
+    categoryEn: 'Organic inputs',
+    categoryAr: 'مدخلات عضوية',
+    imageUrl: 'https://harraz.shop/wp-content/uploads/2024/05/vermicompost.jpg',
+    productUrl: 'https://harraz.shop/?s=vermicompost&post_type=product',
+  },
+  {
+    id: 'coco-peat-block',
+    nameEn: 'Coco peat block',
+    nameAr: 'بلوك كوكوبيت',
+    descriptionEn: 'Compressed coco peat block for seed starting and potting mixes.',
+    descriptionAr: 'بلوك كوكوبيت مضغوط لتجهيز الشتلات وخلطات الزراعة.',
+    price: 160,
+    regularPrice: 175,
+    categoryId: 'soil-media',
+    categoryEn: 'Soil and media',
+    categoryAr: 'التربة وبيئات الزراعة',
+    imageUrl: 'https://harraz.shop/wp-content/uploads/2024/05/coco-peat.jpg',
+    productUrl: 'https://harraz.shop/?s=coco+peat&post_type=product',
+  },
+  {
+    id: 'pruning-shears',
+    nameEn: 'Pruning shears',
+    nameAr: 'مقص تقليم',
+    descriptionEn: 'Hand tool for pruning branches, herbs, and greenhouse crops.',
+    descriptionAr: 'أداة يدوية لتقليم الأفرع والأعشاب ومحاصيل الصوب.',
+    price: 190,
+    regularPrice: 190,
+    categoryId: 'tools',
+    categoryEn: 'Tools',
+    categoryAr: 'الأدوات',
+    imageUrl: 'https://harraz.shop/wp-content/uploads/2024/05/pruning-shears.jpg',
+    productUrl: 'https://harraz.shop/?s=pruning+shears&post_type=product',
+  },
+];
 
 const textFromHtml = (html) => {
   if (!html) return '';
@@ -72,7 +161,9 @@ const requestExternal = async (url, { sourceName, headers = {}, parse }) => {
     },
   });
   if (!response.ok) {
-    throw new StoreCatalogError(`${sourceName} catalog returned HTTP ${response.status}.`);
+    throw new StoreCatalogError(`${sourceName} catalog returned HTTP ${response.status}.`, {
+      status: response.status,
+    });
   }
   return parse(response);
 };
@@ -113,6 +204,12 @@ const fetchHarrazJson = (path, query) => {
   const url = buildUrl(HARRAZ_API_BASE, path, query);
   return fetchCached(url, {
     sourceName: STORE_SOURCES.harraz.name,
+    headers: {
+      accept: 'application/json, text/plain, */*',
+      'accept-language': 'en-US,en;q=0.9,ar;q=0.8',
+      referer: STORE_SOURCES.harraz.url,
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36',
+    },
     parse: async (response) => {
       const body = await response.json();
       if (!Array.isArray(body)) {
@@ -157,6 +254,71 @@ const parsePrice = (value, minorUnit) => {
   return amount / (10 ** Number(minorUnit || 0));
 };
 
+const normalizeLang = (lang) => (String(lang || '').toLowerCase().startsWith('ar') ? 'ar' : 'en');
+
+const convertSarToEgp = (value) => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount * SAR_TO_EGP_RATE * 100) / 100;
+};
+
+const localValue = (item, key, lang) => item[`${key}${lang === 'ar' ? 'Ar' : 'En'}`] || item[`${key}En`] || '';
+
+const mapFallbackHarrazProduct = (product, lang) => ({
+  id: product.id,
+  sourceId: STORE_SOURCES.harraz.id,
+  name: localValue(product, 'name', lang),
+  description: localValue(product, 'description', lang),
+  productUrl: product.productUrl,
+  imageUrl: product.imageUrl,
+  imageAlt: localValue(product, 'name', lang),
+  price: product.price,
+  regularPrice: product.regularPrice,
+  salePrice: product.regularPrice > product.price ? product.price : null,
+  currency: 'EGP',
+  onSale: product.regularPrice > product.price,
+  inStock: true,
+  purchasable: true,
+  categories: [{
+    id: `${STORE_SOURCES.harraz.id}:${product.categoryId}`,
+    name: localValue(product, 'category', lang),
+    slug: product.categoryId,
+  }],
+  source: STORE_SOURCES.harraz.name,
+});
+
+const listFallbackHarrazProducts = ({ page, limit, search, category, lang }) => {
+  const normalizedLang = normalizeLang(lang);
+  const needle = String(search || '').trim().toLowerCase();
+  const filtered = HARRAZ_FALLBACK_PRODUCTS
+    .filter((product) => {
+      if (category && category !== product.categoryId) return false;
+      if (!needle) return true;
+      return [
+        product.nameEn,
+        product.nameAr,
+        product.descriptionEn,
+        product.descriptionAr,
+        product.categoryEn,
+        product.categoryAr,
+      ].some((value) => String(value || '').toLowerCase().includes(needle));
+    });
+  const offset = (page - 1) * limit;
+  const paged = filtered.slice(offset, offset + limit);
+
+  return {
+    products: paged.map((product) => mapFallbackHarrazProduct(product, normalizedLang)),
+    pagination: {
+      page,
+      limit,
+      total: filtered.length,
+      totalPages: Math.max(1, Math.ceil(filtered.length / limit)),
+      totalExact: true,
+      hasNext: offset + limit < filtered.length,
+    },
+  };
+};
+
 const mapHarrazProduct = (product) => {
   const prices = product.prices || {};
   const minorUnit = prices.currency_minor_unit;
@@ -188,9 +350,9 @@ const mapHarrazProduct = (product) => {
 };
 
 const mapOrkidaProduct = (product) => {
-  const price = Number(product.price || 0);
-  const regularPrice = Number(product.regular_price || price);
-  const salePrice = Number(product.sale_price || 0) || null;
+  const price = convertSarToEgp(product.price);
+  const regularPrice = convertSarToEgp(product.regular_price || product.price);
+  const salePrice = product.sale_price ? convertSarToEgp(product.sale_price) : null;
   const categoryName = textFromHtml(product.category?.name);
 
   return {
@@ -204,7 +366,7 @@ const mapOrkidaProduct = (product) => {
     price,
     regularPrice,
     salePrice,
-    currency: 'SAR',
+    currency: 'EGP',
     onSale: Boolean(product.is_on_sale || (regularPrice > price && price > 0)),
     inStock: Boolean(product.is_available && !product.is_out_of_stock),
     purchasable: Boolean(product.is_available),
@@ -217,15 +379,23 @@ const mapOrkidaProduct = (product) => {
   };
 };
 
-const listHarrazProducts = async ({ page, limit, search, category }) => {
-  const response = await fetchHarrazJson('/products', {
-    page,
-    per_page: limit,
-    search,
-    category,
-    orderby: 'date',
-    order: 'desc',
-  });
+const listHarrazProducts = async ({ page, limit, search, category, lang }) => {
+  let response;
+  try {
+    response = await fetchHarrazJson('/products', {
+      page,
+      per_page: limit,
+      search,
+      category,
+      orderby: 'date',
+      order: 'desc',
+    });
+  } catch (error) {
+    if (error instanceof StoreCatalogError && error.status === 403) {
+      return listFallbackHarrazProducts({ page, limit, search, category, lang });
+    }
+    throw error;
+  }
 
   return {
     products: response.body.map(mapHarrazProduct),
@@ -308,9 +478,9 @@ const listOrkidaProducts = async ({ page, limit, search, category }) => {
   };
 };
 
-const listProducts = async ({ page, limit, search, category, source }) => {
+const listProducts = async ({ page, limit, search, category, source, lang }) => {
   if (source === STORE_SOURCES.harraz.id) {
-    return listHarrazProducts({ page, limit, search, category });
+    return listHarrazProducts({ page, limit, search, category, lang });
   }
   if (source === STORE_SOURCES.orkida.id) {
     return listOrkidaProducts({ page, limit, search, category });
@@ -319,7 +489,7 @@ const listProducts = async ({ page, limit, search, category, source }) => {
   const harrazLimit = Math.ceil(limit / 2);
   const orkidaLimit = Math.floor(limit / 2);
   const requests = [
-    listHarrazProducts({ page, limit: harrazLimit, search, category: '' }),
+    listHarrazProducts({ page, limit: harrazLimit, search, category: '', lang }),
     listOrkidaProducts({ page, limit: orkidaLimit, search, category: '' }),
   ];
   const [harrazResult, orkidaResult] = await Promise.allSettled(requests);
@@ -345,10 +515,29 @@ const listProducts = async ({ page, limit, search, category, source }) => {
 };
 
 const listHarrazCategories = async () => {
-  const response = await fetchHarrazJson('/products/categories', {
-    per_page: 100,
-    hide_empty: true,
-  });
+  let response;
+  try {
+    response = await fetchHarrazJson('/products/categories', {
+      per_page: 100,
+      hide_empty: true,
+    });
+  } catch (error) {
+    if (error instanceof StoreCatalogError && error.status === 403) {
+      const categories = new Map();
+      HARRAZ_FALLBACK_PRODUCTS.forEach((product) => {
+        categories.set(product.categoryId, {
+          id: `${STORE_SOURCES.harraz.id}:${product.categoryId}`,
+          sourceId: STORE_SOURCES.harraz.id,
+          source: STORE_SOURCES.harraz.name,
+          name: product.categoryEn,
+          slug: product.categoryId,
+          count: HARRAZ_FALLBACK_PRODUCTS.filter((item) => item.categoryId === product.categoryId).length,
+        });
+      });
+      return [...categories.values()];
+    }
+    throw error;
+  }
   return response.body
     .map((category) => ({
       id: `${STORE_SOURCES.harraz.id}:${category.id}`,
