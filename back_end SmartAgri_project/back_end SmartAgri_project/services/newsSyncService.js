@@ -32,7 +32,7 @@ const parseMaxArticlesPerSource = () => {
   if (rawValue == null || rawValue.trim() === '') return 50;
 
   const parsedValue = parseInt(rawValue, 10);
-  if (!Number.isFinite(parsedValue)) return 50;
+  if (!Number.isFinite(parsedValue)) return 12;
   return Math.max(0, parsedValue);
 };
 const MAX_ARTICLES_PER_SOURCE = parseMaxArticlesPerSource();

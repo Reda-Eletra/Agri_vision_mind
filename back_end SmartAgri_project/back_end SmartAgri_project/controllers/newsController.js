@@ -28,6 +28,43 @@ const parseDateFilter = (value, endOfDay = false) => {
   return parsed;
 };
 
+let emptyNewsSyncInFlight = null;
+
+const runNewsQuery = async ({ whereClause, params, limit, offset }) => {
+  const result = await pool.query(
+    `SELECT id, title, summary, image_url, category, published_at, created_at, updated_at,
+            source_name, source_url, source_article_id, is_imported
+     FROM news
+     ${whereClause}
+     ORDER BY published_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset]
+  );
+  const total = await pool.query(`SELECT COUNT(*) FROM news ${whereClause}`, params);
+  const sources = await pool.query(
+    `SELECT DISTINCT source_name
+     FROM news
+     WHERE is_visible = TRUE AND deleted_at IS NULL
+       AND source_name IS NOT NULL AND source_name <> ''
+     ORDER BY source_name ASC`
+  );
+
+  return { result, total, sources };
+};
+
+const ensureNewsWhenEmpty = async () => {
+  if (!emptyNewsSyncInFlight) {
+    emptyNewsSyncInFlight = syncImportedNews()
+      .catch((error) => {
+        console.error('[news] lazy sync failed:', error.message || error);
+      })
+      .finally(() => {
+        emptyNewsSyncInFlight = null;
+      });
+  }
+  await emptyNewsSyncInFlight;
+};
+
 // ─── GET /news ────────────────────────────────────────────────
 const getNews = async (req, res) => {
   try {
@@ -58,24 +95,14 @@ const getNews = async (req, res) => {
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
-    const result = await pool.query(
-      `SELECT id, title, summary, image_url, category, published_at, created_at, updated_at,
-              source_name, source_url, source_article_id, is_imported
-       FROM news
-       ${whereClause}
-       ORDER BY published_at DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, limit, offset]
-    );
-    const total = await pool.query(`SELECT COUNT(*) FROM news ${whereClause}`, params);
-    const totalCount = parseInt(total.rows[0].count, 10);
-    const sources = await pool.query(
-      `SELECT DISTINCT source_name
-       FROM news
-       WHERE is_visible = TRUE AND deleted_at IS NULL
-         AND source_name IS NOT NULL AND source_name <> ''
-       ORDER BY source_name ASC`
-    );
+    let { result, total, sources } = await runNewsQuery({ whereClause, params, limit, offset });
+    let totalCount = parseInt(total.rows[0].count, 10);
+
+    if (totalCount === 0 && !source && !dateFrom && !dateTo) {
+      await ensureNewsWhenEmpty();
+      ({ result, total, sources } = await runNewsQuery({ whereClause, params, limit, offset }));
+      totalCount = parseInt(total.rows[0].count, 10);
+    }
 
     res.json({
       message: 'Success',
