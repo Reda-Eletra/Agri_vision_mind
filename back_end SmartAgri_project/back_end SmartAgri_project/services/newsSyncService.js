@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const { load } = require('cheerio');
 const { parseNewsArticle } = require('./newsArticleParser');
 
 const NEWS_SOURCES = [
@@ -13,7 +14,7 @@ const NEWS_SOURCES = [
   },
   {
     name: 'Agriculture Egypt',
-    homepage: 'https://agricultureegypt.com/index.aspx',
+    homepage: 'https://agricultureegypt.com/News/',
     baseUrl: 'https://agricultureegypt.com/',
     articlePatterns: [/\/News\/\d+(?:\/|$)/i, /\/News\/\d+\/[^"'#?]+/i],
     bodySelectors: ['.article-wrapper.news-details .brief'],
@@ -73,8 +74,46 @@ const extractArticleDetails = async (source, articleUrl) => {
   return parseNewsArticle(html, source, articleUrl);
 };
 
-const extractCandidateArticleUrls = (html, source) => {
-  const urls = [];
+const textFromHtml = (html = '') => load(`<div>${html}</div>`)('div').text().replace(/\s+/g, ' ').trim();
+
+const findPreviewContainer = ($, anchor) => {
+  const candidates = [
+    $(anchor).closest('article'),
+    $(anchor).closest('.news-item'),
+    $(anchor).closest('.item'),
+    $(anchor).closest('.card'),
+    $(anchor).closest('.col-md-4, .col-md-6, .col-lg-4, .col-sm-6'),
+    $(anchor).parent(),
+  ].filter((candidate) => candidate.length > 0);
+
+  return candidates.find((candidate) => textFromHtml(candidate.text()).length >= 30) || $(anchor).parent();
+};
+
+const extractPreviewImage = ($, container, source) => {
+  const image = container.find('img').first();
+  const src = image.attr('data-src') || image.attr('data-original') || image.attr('src');
+  return toAbsoluteUrl(src, source.baseUrl);
+};
+
+const extractPreviewDate = (text) => {
+  const isoMatch = text.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toISOString();
+  }
+
+  const slashMatch = text.match(/\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).toISOString();
+  }
+
+  return null;
+};
+
+const extractCandidateArticles = (html, source) => {
+  const $ = load(html);
+  const candidates = new Map();
   const anchorRegex = /<a\b[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let match;
 
@@ -86,11 +125,52 @@ const extractCandidateArticleUrls = (html, source) => {
     const isArticleUrl = source.articlePatterns.some((pattern) => pattern.test(new URL(absoluteUrl).pathname + new URL(absoluteUrl).search));
     if (!isArticleUrl) continue;
 
-    urls.push(absoluteUrl);
+    if (candidates.has(absoluteUrl)) continue;
+
+    const anchor = $(`a[href="${href.replace(/"/g, '\\"')}"]`).first();
+    const container = anchor.length > 0 ? findPreviewContainer($, anchor) : null;
+    const title = textFromHtml(anchor.text() || match[2]);
+    const previewText = container ? textFromHtml(container.text()) : title;
+    const summary = previewText && previewText !== title
+      ? previewText.replace(title, '').trim().slice(0, 260)
+      : title;
+
+    candidates.set(absoluteUrl, {
+      url: absoluteUrl,
+      title,
+      summary,
+      imageUrl: container ? extractPreviewImage($, container, source) : null,
+      publishedAt: extractPreviewDate(previewText),
+    });
   }
 
-  const uniqueUrls = [...new Set(urls)];
-  return MAX_ARTICLES_PER_SOURCE > 0 ? uniqueUrls.slice(0, MAX_ARTICLES_PER_SOURCE) : uniqueUrls;
+  const articles = [...candidates.values()]
+    .filter((candidate) => candidate.title && candidate.title.length >= 12);
+  return MAX_ARTICLES_PER_SOURCE > 0 ? articles.slice(0, MAX_ARTICLES_PER_SOURCE) : articles;
+};
+
+const fallbackArticleFromPreview = (source, preview) => ({
+  title: preview.title,
+  summary: preview.summary || preview.title,
+  content: preview.summary || preview.title,
+  imageUrl: preview.imageUrl,
+  category: source.defaultCategory,
+  publishedAt: preview.publishedAt || new Date().toISOString(),
+  source: source.name,
+  sourceUrl: preview.url,
+  sourceArticleId: preview.url.match(/\/News\/(\d+)/i)?.[1] || null,
+});
+
+const mergeArticleWithPreview = (article, source, preview) => {
+  if (!article) return fallbackArticleFromPreview(source, preview);
+  return {
+    ...article,
+    title: article.title || preview.title,
+    summary: article.summary || preview.summary || article.title || preview.title,
+    content: article.content || preview.summary || article.summary || preview.title,
+    imageUrl: article.imageUrl || preview.imageUrl,
+    publishedAt: article.publishedAt || preview.publishedAt || new Date().toISOString(),
+  };
 };
 
 const upsertImportedArticle = async (article) => {
@@ -150,29 +230,37 @@ const upsertImportedArticle = async (article) => {
 
 const syncSource = async (source) => {
   const homepageHtml = await fetchHtml(source.homepage);
-  const articleUrls = extractCandidateArticleUrls(homepageHtml, source);
+  const articlePreviews = extractCandidateArticles(homepageHtml, source);
 
   let created = 0;
   let updated = 0;
   let failed = 0;
 
-  for (const articleUrl of articleUrls) {
+  for (const preview of articlePreviews) {
     try {
-      const article = await extractArticleDetails(source, articleUrl);
+      const parsedArticle = await extractArticleDetails(source, preview.url);
+      const article = mergeArticleWithPreview(parsedArticle, source, preview);
       if (!article?.title || !article?.summary) continue;
 
       const result = await upsertImportedArticle(article);
       if (result === 'created') created += 1;
       else updated += 1;
     } catch (error) {
-      failed += 1;
-      console.error(`[news-sync] ${source.name} failed for ${articleUrl}:`, error.message || error);
+      try {
+        const article = fallbackArticleFromPreview(source, preview);
+        const result = await upsertImportedArticle(article);
+        if (result === 'created') created += 1;
+        else updated += 1;
+      } catch (fallbackError) {
+        failed += 1;
+        console.error(`[news-sync] ${source.name} failed for ${preview.url}:`, fallbackError.message || fallbackError);
+      }
     }
   }
 
   return {
     source: source.name,
-    scanned: articleUrls.length,
+    scanned: articlePreviews.length,
     created,
     updated,
     failed,
