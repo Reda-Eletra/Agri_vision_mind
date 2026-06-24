@@ -342,7 +342,7 @@ const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) =
                 <div className="avm-home-legacy-grid grid lg:grid-cols-2 gap-14 lg:gap-20 items-center">
 
                     {/* ── Text Side ── */}
-                    <div className="avm-home-hero-content relative z-10 text-center lg:text-left rtl:lg:text-right">
+                    <div className={`avm-home-hero-content relative z-10 text-center ${isArabic ? 'lg:order-2 lg:text-right' : 'lg:text-left'}`}>
 
                         {/* Eyebrow badge */}
                         <div className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full mb-7 hp-fade-up"
@@ -357,21 +357,21 @@ const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) =
                         </div>
 
                         {/* Headline */}
-                        <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-[var(--ag-text)] leading-tight mb-6 hp-fade-up d-100">
+                        <h1 className={`${isArabic ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'} font-extrabold text-[var(--ag-text)] leading-tight mb-6 hp-fade-up d-100`}>
                             {t('homePage.hero.title')}
                             <span className="block hp-shimmer-text mt-2">{t('homePage.hero.gradientTitle')}</span>
                         </h1>
 
-                        <p className="text-lg md:text-xl text-[var(--ag-text-soft)] mb-6 leading-relaxed hp-fade-up d-200 max-w-xl mx-auto lg:mx-0">
+                        <p className={`text-lg md:text-xl text-[var(--ag-text-soft)] mb-6 leading-relaxed hp-fade-up d-200 max-w-xl mx-auto ${isArabic ? 'lg:mr-0 lg:ml-auto' : 'lg:mx-0'}`}>
                             {t('homePage.hero.subtitle')}
                         </p>
 
-                        <p className="text-base text-[var(--ag-text-muted)] mb-10 leading-relaxed hp-fade-up d-300 max-w-xl mx-auto lg:mx-0">
+                        <p className={`text-base text-[var(--ag-text-muted)] mb-10 leading-relaxed hp-fade-up d-300 max-w-xl mx-auto ${isArabic ? 'lg:mr-0 lg:ml-auto' : 'lg:mx-0'}`}>
                             {t('homePage.hero.description')}
                         </p>
 
                         {/* CTA Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start hp-fade-up d-400">
+                        <div className={`flex flex-col sm:flex-row gap-4 justify-center hp-fade-up d-400 ${isArabic ? 'lg:justify-end' : 'lg:justify-start'}`}>
                             <button
                                type="button"
                                 onClick={() => setActiveView('doctor')}
@@ -396,8 +396,8 @@ const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) =
                         </div>
 
                         {/* Trust badges */}
-                        <div className="mt-10 flex flex-wrap gap-4 justify-center lg:justify-start hp-fade-up d-500">
-                            {[t('homePage.hero.trustBadge1'), t('homePage.hero.trustBadge2'), t('homePage.hero.trustBadge3')].map((b) => (
+                        <div className={`mt-10 flex flex-wrap gap-4 justify-center hp-fade-up d-500 ${isArabic ? 'lg:justify-end' : 'lg:justify-start'}`}>
+                            {[t('homePage.hero.trustBadge1'), t('homePage.hero.trustBadge2')].map((b) => (
                                 <span key={b} className="inline-flex items-center gap-1.5 text-xs text-[var(--ag-text-muted)] font-semibold">
                                     <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950/40">
                                         <I.check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
@@ -409,7 +409,7 @@ const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) =
                     </div>
 
                     {/* ── Visual Side ── */}
-                    <div className="avm-home-legacy-visual relative hp-fade-up d-200">
+                    <div className={`avm-home-legacy-visual relative hp-fade-up d-200 ${isArabic ? 'lg:order-1' : ''}`}>
                         <div className="relative z-10">
                             {/* Main hero image */}
                             <div className="hp-img-wrap rounded-[2.5rem] shadow-2xl border-4 border-white/40 dark:border-gray-700/40 overflow-hidden"

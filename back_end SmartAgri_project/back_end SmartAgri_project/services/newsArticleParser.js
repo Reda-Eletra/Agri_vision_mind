@@ -28,6 +28,10 @@ const GENERIC_BODY_SELECTORS = [
   '.entry-content',
   '.post-content',
   '.news-details .brief',
+  '.articlebody',
+  '.articleBody',
+  '.article-wrapper',
+  '.details',
   '#ctl00_ContentPlaceHolder1_divContent',
   'article',
 ];
@@ -228,7 +232,17 @@ const articleCategory = ($, source) =>
     $('[itemprop="articleSection"]').first().text()
   ).toLowerCase() || source.defaultCategory;
 
-const sourceArticleId = (articleUrl) => articleUrl.match(/\/News\/(\d+)/i)?.[1] || null;
+const sourceArticleId = (articleUrl) => {
+  try {
+    const pathname = new URL(articleUrl).pathname;
+    return pathname.match(/\/News\/(\d+)/i)?.[1]
+      || pathname.match(/\/news\/(?:newdetails|newsdetails)\/(\d+)/i)?.[1]
+      || pathname.match(/(\d{4,})/)?.[1]
+      || null;
+  } catch {
+    return articleUrl.match(/(\d{4,})/)?.[1] || null;
+  }
+};
 
 const parseNewsArticle = (html, source, articleUrl) => {
   const $ = cheerio.load(html);

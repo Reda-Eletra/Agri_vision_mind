@@ -753,18 +753,6 @@ const App: React.FC = () => {
 
       <main className={activeView === 'home' ? 'flex-1 pb-12' : 'flex-1 px-4 pb-12 sm:px-6 lg:px-8'}>
         <div className={activeView === 'home' ? '' : 'mx-auto max-w-[92rem]'}>
-          {activeView !== 'home' && activeView !== 'news' && activeView !== 'dashboard' && (
-            <div className="mb-6">
-              <div className="ui-section-eyebrow">
-                <SparklineIcon />
-                <span>{activeView === 'dashboard' ? t('app.buttons.dashboard') : getViewLabel(activeView)}</span>
-              </div>
-              <h1 className="text-[clamp(1.8rem,2.3vw,2.8rem)] font-extrabold tracking-[-0.04em] text-[var(--ag-text)]">
-                {getViewLabel(activeView)}
-              </h1>
-            </div>
-          )}
-
           <ErrorBoundary>
             <Suspense
               fallback={
@@ -825,11 +813,5 @@ const App: React.FC = () => {
   );
 };
 
-const SparklineIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 17l5-5 4 4 8-8" />
-    <path d="M14 8h6v6" />
-  </svg>
-);
 
 export default App;

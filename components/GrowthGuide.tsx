@@ -372,7 +372,7 @@ export const GrowthGuide: React.FC = () => {
       {/* Main Subview Switch */}
       {!selectedPlantSlug ? (
         /* ─── Subview 1: Catalog List ─── */
-        <div className="mt-[-4rem] relative z-10 px-4 max-w-7xl mx-auto">
+        <div className="relative z-10 px-4 max-w-7xl mx-auto">
           {/* Hero search card */}
           <section className="ui-card ui-surface max-w-4xl mx-auto rounded-[2rem] p-6 md:p-10 mb-10">
             <h2 className="text-center text-2xl font-extrabold tracking-[-0.04em] text-[var(--ag-text)] md:text-4xl">

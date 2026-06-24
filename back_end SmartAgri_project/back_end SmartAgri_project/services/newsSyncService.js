@@ -8,8 +8,17 @@ const NEWS_SOURCES = [
     homepage: 'https://agri.ahram.org.eg/',
     baseUrl: 'https://agri.ahram.org.eg/',
     articlePatterns: [/\/News\/\d+\.aspx(?:\?.*)?$/i, /\/News\/\d+(?:\/|$)/i],
-    bodySelectors: ['#ctl00_ContentPlaceHolder1_divContent'],
-    imageSelectors: ['#ctl00_ContentPlaceHolder1_imgNews'],
+    bodySelectors: [
+      '#ctl00_ContentPlaceHolder1_divContent',
+      '.news-details',
+      '.article-content',
+      'article',
+    ],
+    imageSelectors: [
+      '#ctl00_ContentPlaceHolder1_imgNews',
+      '.news-details img',
+      'article img',
+    ],
     defaultCategory: 'agri',
   },
   {
@@ -17,22 +26,56 @@ const NEWS_SOURCES = [
     homepage: 'https://agricultureegypt.com/News/',
     baseUrl: 'https://agricultureegypt.com/',
     articlePatterns: [/\/News\/\d+(?:\/|$)/i, /\/News\/\d+\/[^"'#?]+/i],
-    bodySelectors: ['.article-wrapper.news-details .brief'],
-    imageSelectors: ['.article-wrapper.news-details img', '.news-header img'],
+    bodySelectors: [
+      '.article-wrapper.news-details .brief',
+      '.article-wrapper.news-details',
+      '.news-details',
+      '.brief',
+      'article',
+    ],
+    imageSelectors: [
+      '.article-wrapper.news-details img',
+      '.news-header img',
+      '.news-details img',
+      'article img',
+    ],
+    defaultCategory: 'agri',
+  },
+  {
+    name: 'Akhbar Elyom',
+    homepage: 'https://akhbarelyom.com/News/Search/1/1?JournalID=1&query=%D8%A7%D9%84%D8%B2%D8%B1%D8%A7%D8%B9%D8%A9',
+    baseUrl: 'https://akhbarelyom.com/',
+    articlePatterns: [/\/news\/newdetails\/\d+\/\d+\//i, /\/news\/newsdetails\/\d+\/\d+\//i],
+    bodySelectors: [
+      '.articlebody',
+      '.articleBody',
+      '.article-body',
+      '.news-details',
+      '.details',
+      '.entry-content',
+      'article',
+    ],
+    imageSelectors: [
+      '.article-image img',
+      '.newsImage img',
+      '.details img',
+      '.articlebody img',
+      'article img',
+    ],
     defaultCategory: 'agri',
   },
 ];
 
 const SYNC_ENABLED = (process.env.NEWS_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
-const SYNC_INTERVAL_MINUTES = Math.max(5, parseInt(process.env.NEWS_SYNC_INTERVAL_MINUTES || '30', 10) || 30);
+const SYNC_INTERVAL_MINUTES = Math.max(5, parseInt(process.env.NEWS_SYNC_INTERVAL_MINUTES || '60', 10) || 60);
 const STARTUP_DELAY_MS = Math.max(1000, parseInt(process.env.NEWS_SYNC_STARTUP_DELAY_MS || '5000', 10) || 5000);
 
 const parseMaxArticlesPerSource = () => {
   const rawValue = process.env.NEWS_SYNC_MAX_ARTICLES_PER_SOURCE;
-  if (rawValue == null || rawValue.trim() === '') return 50;
+  if (rawValue == null || rawValue.trim() === '') return 20;
 
   const parsedValue = parseInt(rawValue, 10);
-  if (!Number.isFinite(parsedValue)) return 12;
+  if (!Number.isFinite(parsedValue)) return 20;
   return Math.max(0, parsedValue);
 };
 const MAX_ARTICLES_PER_SOURCE = parseMaxArticlesPerSource();
@@ -51,7 +94,7 @@ const toAbsoluteUrl = (href, baseUrl) => {
 
 const fetchHtml = async (url) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch(url, {
       signal: controller.signal,
@@ -132,7 +175,7 @@ const extractCandidateArticles = (html, source) => {
     const title = textFromHtml(anchor.text() || match[2]);
     const previewText = container ? textFromHtml(container.text()) : title;
     const summary = previewText && previewText !== title
-      ? previewText.replace(title, '').trim().slice(0, 260)
+      ? previewText.replace(title, '').trim().slice(0, 360)
       : title;
 
     candidates.set(absoluteUrl, {
@@ -149,6 +192,18 @@ const extractCandidateArticles = (html, source) => {
   return MAX_ARTICLES_PER_SOURCE > 0 ? articles.slice(0, MAX_ARTICLES_PER_SOURCE) : articles;
 };
 
+const extractSourceArticleId = (articleUrl) => {
+  try {
+    const pathname = new URL(articleUrl).pathname;
+    return pathname.match(/\/News\/(\d+)/i)?.[1]
+      || pathname.match(/\/news\/(?:newdetails|newsdetails)\/(\d+)/i)?.[1]
+      || pathname.match(/(\d{4,})/)?.[1]
+      || null;
+  } catch {
+    return articleUrl.match(/(\d{4,})/)?.[1] || null;
+  }
+};
+
 const fallbackArticleFromPreview = (source, preview) => ({
   title: preview.title,
   summary: preview.summary || preview.title,
@@ -158,7 +213,7 @@ const fallbackArticleFromPreview = (source, preview) => ({
   publishedAt: preview.publishedAt || new Date().toISOString(),
   source: source.name,
   sourceUrl: preview.url,
-  sourceArticleId: preview.url.match(/\/News\/(\d+)/i)?.[1] || null,
+  sourceArticleId: extractSourceArticleId(preview.url),
 });
 
 const mergeArticleWithPreview = (article, source, preview) => {
