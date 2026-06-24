@@ -322,7 +322,8 @@ export const HomePage: React.FC<HomePageProps> = ({ setActiveView, onOpenChat, o
 
 // ─── HERO ────────────────────────────────────────────────────────────────────
 const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) => {
-    const { t } = useTranslation();
+    const { t, language } = useTranslation();
+    const isArabic = language === 'ar';
     return (
         <section className="avm-home-hero relative pt-28 pb-8 lg:pt-36 lg:pb-20 overflow-hidden">
             <HeroParticles />
