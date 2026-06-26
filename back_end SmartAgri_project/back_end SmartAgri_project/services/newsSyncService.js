@@ -69,13 +69,20 @@ const NEWS_SOURCES = [
 const SYNC_ENABLED = (process.env.NEWS_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
 const SYNC_INTERVAL_MINUTES = Math.max(5, parseInt(process.env.NEWS_SYNC_INTERVAL_MINUTES || '60', 10) || 60);
 const STARTUP_DELAY_MS = Math.max(1000, parseInt(process.env.NEWS_SYNC_STARTUP_DELAY_MS || '5000', 10) || 5000);
+const FETCH_HEADERS = {
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'accept-language': 'ar-EG,ar;q=0.9,en-US;q=0.7,en;q=0.5',
+  'cache-control': 'no-cache',
+  pragma: 'no-cache',
+};
 
 const parseMaxArticlesPerSource = () => {
   const rawValue = process.env.NEWS_SYNC_MAX_ARTICLES_PER_SOURCE;
-  if (rawValue == null || rawValue.trim() === '') return 20;
+  if (rawValue == null || rawValue.trim() === '') return 50;
 
   const parsedValue = parseInt(rawValue, 10);
-  if (!Number.isFinite(parsedValue)) return 20;
+  if (!Number.isFinite(parsedValue)) return 50;
   return Math.max(0, parsedValue);
 };
 const MAX_ARTICLES_PER_SOURCE = parseMaxArticlesPerSource();
@@ -98,10 +105,7 @@ const fetchHtml = async (url) => {
   try {
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        'user-agent': 'Mozilla/5.0 (compatible; SmartAgriNewsSync/1.0)',
-        'accept-language': 'ar,en;q=0.8',
-      },
+      headers: FETCH_HEADERS,
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -122,9 +126,16 @@ const textFromHtml = (html = '') => load(`<div>${html}</div>`)('div').text().rep
 const findPreviewContainer = ($, anchor) => {
   const candidates = [
     $(anchor).closest('article'),
+    $(anchor).closest('.post'),
+    $(anchor).closest('.media'),
     $(anchor).closest('.news-item'),
+    $(anchor).closest('.news-list'),
+    $(anchor).closest('.newsBlock'),
+    $(anchor).closest('.news-box'),
+    $(anchor).closest('.latest-news'),
     $(anchor).closest('.item'),
     $(anchor).closest('.card'),
+    $(anchor).closest('.row'),
     $(anchor).closest('.col-md-4, .col-md-6, .col-lg-4, .col-sm-6'),
     $(anchor).parent(),
   ].filter((candidate) => candidate.length > 0);
@@ -132,9 +143,26 @@ const findPreviewContainer = ($, anchor) => {
   return candidates.find((candidate) => textFromHtml(candidate.text()).length >= 30) || $(anchor).parent();
 };
 
+const firstSrcFromSrcset = (srcset = '') =>
+  String(srcset || '')
+    .split(',')
+    .map((entry) => entry.trim().split(/\s+/)[0])
+    .find(Boolean) || null;
+
+const imageCandidateUrl = ($image) =>
+  $image.attr('data-src') ||
+  $image.attr('data-original') ||
+  $image.attr('data-lazy-src') ||
+  $image.attr('data-lazy') ||
+  $image.attr('data-image') ||
+  $image.attr('data-img') ||
+  firstSrcFromSrcset($image.attr('data-srcset') || $image.attr('srcset')) ||
+  $image.attr('src') ||
+  null;
+
 const extractPreviewImage = ($, container, source) => {
   const image = container.find('img').first();
-  const src = image.attr('data-src') || image.attr('data-original') || image.attr('src');
+  const src = imageCandidateUrl(image);
   return toAbsoluteUrl(src, source.baseUrl);
 };
 
@@ -157,22 +185,21 @@ const extractPreviewDate = (text) => {
 const extractCandidateArticles = (html, source) => {
   const $ = load(html);
   const candidates = new Map();
-  const anchorRegex = /<a\b[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let match;
 
-  while ((match = anchorRegex.exec(html)) !== null) {
-    const href = match[1];
+  $('a[href]').each((_index, anchorElement) => {
+    const anchor = $(anchorElement);
+    const href = anchor.attr('href');
     const absoluteUrl = toAbsoluteUrl(href, source.baseUrl);
-    if (!absoluteUrl) continue;
+    if (!absoluteUrl) return;
 
-    const isArticleUrl = source.articlePatterns.some((pattern) => pattern.test(new URL(absoluteUrl).pathname + new URL(absoluteUrl).search));
-    if (!isArticleUrl) continue;
+    const parsedUrl = new URL(absoluteUrl);
+    const isArticleUrl = source.articlePatterns.some((pattern) => pattern.test(parsedUrl.pathname + parsedUrl.search));
+    if (!isArticleUrl) return;
 
-    if (candidates.has(absoluteUrl)) continue;
+    if (candidates.has(absoluteUrl)) return;
 
-    const anchor = $(`a[href="${href.replace(/"/g, '\\"')}"]`).first();
-    const container = anchor.length > 0 ? findPreviewContainer($, anchor) : null;
-    const title = textFromHtml(anchor.text() || match[2]);
+    const container = findPreviewContainer($, anchor);
+    const title = textFromHtml(anchor.text());
     const previewText = container ? textFromHtml(container.text()) : title;
     const summary = previewText && previewText !== title
       ? previewText.replace(title, '').trim().slice(0, 360)
@@ -185,7 +212,7 @@ const extractCandidateArticles = (html, source) => {
       imageUrl: container ? extractPreviewImage($, container, source) : null,
       publishedAt: extractPreviewDate(previewText),
     });
-  }
+  });
 
   const articles = [...candidates.values()]
     .filter((candidate) => candidate.title && candidate.title.length >= 12);

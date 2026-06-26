@@ -68,3 +68,34 @@ test('source body selector excludes author and page boilerplate from article con
   assert.match(article.content, /الفحص والتعبئة/);
   assert.doesNotMatch(article.content, /محرر الموقع|جميع الحقوق/);
 });
+
+test('lazy images and Arabic dates are parsed from publisher pages', () => {
+  const article = parseNewsArticle(
+    `
+      <html>
+        <head><title>تحديثات زراعية عاجلة - أخبار اليوم</title></head>
+        <body>
+          <time>25 يونيو 2026 03:22 م</time>
+          <div class="articlebody">
+            <img data-lazy-src="/uploads/news/main.jpg" src="/placeholder.jpg">
+            <p>أعلنت الجهات الزراعية المختصة تفاصيل جديدة تخص موسم الزراعة الحالي ودعم المزارعين في المحافظات المختلفة.</p>
+            <p>ويشمل القرار متابعة دقيقة للمحاصيل وتحديث آليات الإرشاد الزراعي لضمان وصول المعلومات إلى أصحاب الحيازات.</p>
+          </div>
+        </body>
+      </html>
+    `,
+    {
+      name: 'Akhbar Elyom',
+      baseUrl: 'https://akhbarelyom.com/',
+      bodySelectors: ['.articlebody'],
+      imageSelectors: ['.articlebody img'],
+      defaultCategory: 'agri',
+    },
+    'https://akhbarelyom.com/news/newdetails/12345/1/title'
+  );
+
+  assert.equal(article.title, 'تحديثات زراعية عاجلة');
+  assert.equal(article.imageUrl, 'https://akhbarelyom.com/uploads/news/main.jpg');
+  assert.equal(article.publishedAt, '2026-06-25T15:22:00.000Z');
+  assert.ok(article.content.length > 120);
+});

@@ -29,6 +29,15 @@ const parseDateFilter = (value, endOfDay = false) => {
 };
 
 let emptyNewsSyncInFlight = null;
+let staleNewsSyncInFlight = null;
+let lastStaleCheckAt = 0;
+
+const NEWS_LAZY_SYNC_MAX_AGE_MINUTES = Math.max(
+  5,
+  parseInt(process.env.NEWS_LAZY_SYNC_MAX_AGE_MINUTES || process.env.NEWS_SYNC_INTERVAL_MINUTES || '60', 10) || 60
+);
+const NEWS_STALE_CHECK_INTERVAL_MS = 60 * 1000;
+const NEWS_SYNC_ENABLED = (process.env.NEWS_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
 
 const runNewsQuery = async ({ whereClause, params, limit, offset }) => {
   const result = await pool.query(
@@ -53,6 +62,7 @@ const runNewsQuery = async ({ whereClause, params, limit, offset }) => {
 };
 
 const ensureNewsWhenEmpty = async () => {
+  if (!NEWS_SYNC_ENABLED) return;
   if (!emptyNewsSyncInFlight) {
     emptyNewsSyncInFlight = syncImportedNews()
       .catch((error) => {
@@ -63,6 +73,37 @@ const ensureNewsWhenEmpty = async () => {
       });
   }
   await emptyNewsSyncInFlight;
+};
+
+const refreshNewsWhenStale = async () => {
+  if (!NEWS_SYNC_ENABLED) return;
+  const now = Date.now();
+  if (staleNewsSyncInFlight || now - lastStaleCheckAt < NEWS_STALE_CHECK_INTERVAL_MS) return;
+  lastStaleCheckAt = now;
+
+  try {
+    const result = await pool.query(
+      `SELECT MAX(updated_at) AS last_sync
+       FROM news
+       WHERE is_imported = TRUE AND deleted_at IS NULL`
+    );
+    const lastSync = result.rows[0]?.last_sync ? new Date(result.rows[0].last_sync).getTime() : 0;
+    const isStale = !lastSync || now - lastSync > NEWS_LAZY_SYNC_MAX_AGE_MINUTES * 60 * 1000;
+    if (!isStale) return;
+
+    staleNewsSyncInFlight = syncImportedNews()
+      .then((syncResult) => {
+        console.log('[news] stale lazy sync completed:', syncResult);
+      })
+      .catch((error) => {
+        console.error('[news] stale lazy sync failed:', error.message || error);
+      })
+      .finally(() => {
+        staleNewsSyncInFlight = null;
+      });
+  } catch (error) {
+    console.error('[news] stale check failed:', error.message || error);
+  }
 };
 
 // ─── GET /news ────────────────────────────────────────────────
@@ -102,6 +143,8 @@ const getNews = async (req, res) => {
       await ensureNewsWhenEmpty();
       ({ result, total, sources } = await runNewsQuery({ whereClause, params, limit, offset }));
       totalCount = parseInt(total.rows[0].count, 10);
+    } else if (!source && !dateFrom && !dateTo) {
+      void refreshNewsWhenStale();
     }
 
     res.json({

@@ -19,19 +19,27 @@ const ARABIC_MONTHS = {
 };
 
 const BOILERPLATE_PATTERN =
-  /جميع الحقوق محفوظة|رئيس التحرير|للاشتراكات|اتصل بنا|تابعنا على|كلمات البحث|مواضيع متعلقة|أخبار الساعة|تعليق قيد المراجعة/i;
-const AUTHOR_PATTERN = /^(?:كتب|بقلم)\s*[:：]?\s*/i;
+  /جميع الحقوق محفوظة|رئيس التحرير|للاشتراكات|اتصل بنا|تابعنا على|كلمات البحث|مواضيع متعلقة|أخبار الساعة|تعليق قيد المراجعة|اقرأ أيضا|اقرأ المزيد|شارك/i;
+const AUTHOR_PATTERN = /^(?:كتب|كتبت|بقلم|إعداد|اعداد|تصوير)\s*[:：]?\s*/i;
 const GENERIC_BODY_SELECTORS = [
   '[itemprop="articleBody"]',
   '.article-body',
   '.article-content',
+  '.article-text',
+  '.articleText',
   '.entry-content',
   '.post-content',
   '.news-details .brief',
+  '.news-details',
+  '.newsDetails',
+  '.news-article',
+  '.story-body',
   '.articlebody',
   '.articleBody',
   '.article-wrapper',
   '.details',
+  '.details-content',
+  '.content-details',
   '#ctl00_ContentPlaceHolder1_divContent',
   'article',
 ];
@@ -63,6 +71,23 @@ const absoluteUrl = (url, baseUrl) => {
     return null;
   }
 };
+
+const firstSrcFromSrcset = (srcset = '') =>
+  String(srcset || '')
+    .split(',')
+    .map((entry) => entry.trim().split(/\s+/)[0])
+    .find(Boolean) || null;
+
+const imageAttribute = ($image) =>
+  $image.attr('data-src') ||
+  $image.attr('data-original') ||
+  $image.attr('data-lazy-src') ||
+  $image.attr('data-lazy') ||
+  $image.attr('data-image') ||
+  $image.attr('data-img') ||
+  firstSrcFromSrcset($image.attr('data-srcset') || $image.attr('srcset')) ||
+  $image.attr('src') ||
+  null;
 
 const metaContent = ($, names) => {
   for (const name of names) {
@@ -157,7 +182,9 @@ const articleTitle = ($, structuredArticle) =>
     structuredArticle?.headline ||
     $('h1').first().text() ||
     $('title').first().text()
-  ) || null;
+  )
+    .replace(/\s*[-|]\s*(?:بوابة الأهرام الزراعي|الأهرام الزراعي|عالم الزراعة|أخبار اليوم)\s*$/i, '')
+    .trim() || null;
 
 const articleSummary = ($, structuredArticle, bodyCandidate, title) => {
   const metadataSummary = metaContent($, ['og:description', 'description', 'twitter:description']);
@@ -178,24 +205,30 @@ const structuredImageUrl = (structuredArticle) => {
 const articleImage = ($, source, structuredArticle, articleUrl) => {
   const metadataImage = metaContent($, ['og:image', 'twitter:image']);
   const selectorImage = (source.imageSelectors || [])
-    .map((selector) => $(selector).first().attr('src'))
+    .map((selector) => imageAttribute($(selector).first()))
     .find(Boolean);
-  const bodyImage = $('[itemprop="articleBody"] img, article img, .news-details img').first().attr('src');
+  const bodyImage = imageAttribute($('[itemprop="articleBody"] img, article img, .news-details img, .details img, .articlebody img').first());
   return absoluteUrl(
     metadataImage || structuredImageUrl(structuredArticle) || selectorImage || bodyImage,
     articleUrl
   );
 };
 
+const normalizeDigits = (value = '') =>
+  String(value)
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0));
+
 const parsedDate = (dateValue) => {
   if (!dateValue) return null;
-  const date = new Date(dateValue);
+  const date = new Date(normalizeDigits(dateValue));
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
 const arabicDate = (pageText) => {
-  const match = pageText.match(
-    /(\d{1,2})\s+([أ-يA-Za-z]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*([صمAPMapm.]+)?)?/
+  const normalizedText = normalizeDigits(pageText);
+  const match = normalizedText.match(
+    /(\d{1,2})\s+([ء-يA-Za-z]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*([صمAPMapm.]+)?)?/
   );
   if (!match) return null;
 
