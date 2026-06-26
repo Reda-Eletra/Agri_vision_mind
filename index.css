@@ -4411,6 +4411,47 @@ body.auth-modal-open .ui-floating-dock {
   text-align: left !important;
 }
 
+.avm-home-hero-rtl .avm-home-hero-content {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+  text-align: right !important;
+}
+
+.avm-home-hero-rtl .avm-home-hero-content h1,
+.avm-home-hero-rtl .avm-home-hero-content p {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+
+.avm-home-hero-rtl .avm-home-hero-content > div:first-child {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+
+.avm-home-hero-rtl .avm-home-hero-content .flex.flex-col,
+.avm-home-hero-rtl .avm-home-hero-content .mt-10 {
+  justify-content: flex-end !important;
+}
+
+.avm-home-hero-rtl .avm-home-hero-image {
+  object-position: center center;
+}
+
+.avm-home-hero-rtl .avm-home-hero-network {
+  inset: 0 0 0 auto;
+  mask-image: linear-gradient(270deg, #000 0%, transparent 100%);
+}
+
+.avm-home-hero-rtl .avm-home-drone-beam {
+  left: 12%;
+  right: auto;
+}
+
+.avm-home-hero-rtl .avm-home-arm-pulse {
+  left: 38%;
+  right: auto;
+}
+
 [dir="rtl"] .avm-home-hero-content {
   margin-inline-start: auto;
   text-align: right !important;

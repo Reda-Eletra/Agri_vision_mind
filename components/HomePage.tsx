@@ -325,10 +325,10 @@ const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) =
     const { t, language } = useTranslation();
     const isArabic = language === 'ar';
     return (
-        <section className="avm-home-hero relative pt-28 pb-8 lg:pt-36 lg:pb-20 overflow-hidden">
+        <section className={`avm-home-hero ${isArabic ? 'avm-home-hero-rtl' : ''} relative pt-28 pb-8 lg:pt-36 lg:pb-20 overflow-hidden`} dir={isArabic ? 'rtl' : 'ltr'}>
             <HeroParticles />
             <img
-                src="/images/avm-3d/home-greenhouse-ai.png"
+                src={isArabic ? '/images/avm-3d/home-greenhouse-ai-ar.png' : '/images/avm-3d/home-greenhouse-ai.png'}
                 alt="AI greenhouse with robotic farming equipment"
                 className="avm-home-hero-image"
                 loading="eager"
