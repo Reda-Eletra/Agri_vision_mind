@@ -321,9 +321,22 @@ export const HomePage: React.FC<HomePageProps> = ({ setActiveView, onOpenChat, o
 };
 
 // ─── HERO ────────────────────────────────────────────────────────────────────
+const HERO_IMAGES = [
+    '/images/avm-3d/home-greenhouse-ai.png',
+    '/images/avm-3d/home-greenhouse-ai-ar.png',
+];
+
 const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) => {
     const { t, language } = useTranslation();
     const isArabic = language === 'ar';
+
+    useEffect(() => {
+        HERO_IMAGES.forEach((src) => {
+            const image = new Image();
+            image.decoding = 'async';
+            image.src = src;
+        });
+    }, []);
     return (
         <section className={`avm-home-hero ${isArabic ? 'avm-home-hero-rtl' : ''} relative pt-28 pb-8 lg:pt-36 lg:pb-20 overflow-hidden`} dir={isArabic ? 'rtl' : 'ltr'}>
             <HeroParticles />
@@ -333,6 +346,7 @@ const HeroSection: React.FC<HomePageProps> = ({ setActiveView, onOpenSignup }) =
                 className="avm-home-hero-image"
                 loading="eager"
                 decoding="async"
+                fetchPriority="high"
             />
             <div className="avm-home-hero-shade" />
             <div className="avm-home-hero-network" aria-hidden="true" />

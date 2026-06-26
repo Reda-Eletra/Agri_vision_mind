@@ -4412,20 +4412,20 @@ body.auth-modal-open .ui-floating-dock {
 }
 
 .avm-home-hero-rtl .avm-home-hero-content {
-  margin-inline-start: auto;
-  margin-inline-end: 0;
+  margin-left: auto !important;
+  margin-right: 0 !important;
   text-align: right !important;
 }
 
 .avm-home-hero-rtl .avm-home-hero-content h1,
 .avm-home-hero-rtl .avm-home-hero-content p {
-  margin-inline-start: auto;
-  margin-inline-end: 0;
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 
 .avm-home-hero-rtl .avm-home-hero-content > div:first-child {
-  margin-inline-start: auto;
-  margin-inline-end: 0;
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 
 .avm-home-hero-rtl .avm-home-hero-content .flex.flex-col,
@@ -4453,7 +4453,8 @@ body.auth-modal-open .ui-floating-dock {
 }
 
 [dir="rtl"] .avm-home-hero-content {
-  margin-inline-start: auto;
+  margin-left: auto !important;
+  margin-right: 0 !important;
   text-align: right !important;
 }
 
