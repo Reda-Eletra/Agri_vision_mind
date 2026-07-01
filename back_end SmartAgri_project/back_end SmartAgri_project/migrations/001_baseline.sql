@@ -208,6 +208,9 @@ CREATE TABLE IF NOT EXISTS news (
   summary           TEXT         NOT NULL,
   content           TEXT         NOT NULL,
   image_url         TEXT,
+  author_name       TEXT,
+  images_json       JSONB        NOT NULL DEFAULT '[]'::jsonb,
+  title_hash        TEXT,
   category          VARCHAR(80)  DEFAULT 'general',
   published_at      TIMESTAMP    DEFAULT NOW(),
   created_at        TIMESTAMP    DEFAULT NOW(),
@@ -249,6 +252,7 @@ CREATE INDEX IF NOT EXISTS idx_user_tracked_plants_user_id  ON user_tracked_plan
 CREATE INDEX IF NOT EXISTS idx_user_diag_history_user_id    ON user_diagnosis_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id         ON transactions(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_news_source_url_unique ON news(source_url);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_news_title_hash_unique ON news(title_hash) WHERE title_hash IS NOT NULL AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_news_published_at             ON news(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_news_is_imported              ON news(is_imported);
 CREATE INDEX IF NOT EXISTS idx_posts_visibility              ON posts(is_visible, deleted_at, created_at DESC);

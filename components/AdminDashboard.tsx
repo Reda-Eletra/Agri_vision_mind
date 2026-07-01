@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   ChevronDown, ChevronUp, Edit2, MessageSquare, Newspaper, Plus, RefreshCw, Save,
   ShieldCheck, Trash2, Users, Wheat, X, Eye, EyeOff, Archive, AlertTriangle,
-  CheckCircle, Globe, RotateCcw, ExternalLink, ShieldAlert, Stethoscope
+  CheckCircle, Globe, RotateCcw, ExternalLink, ShieldAlert, Stethoscope, Home
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -688,7 +688,11 @@ const EditGuideModal: React.FC<EditGuideModalProps> = ({ target, onClose, onSave
 // ─── Main Dashboard ──────────────────────────────────────────
 type AdminTab = 'users' | 'posts' | 'news' | 'growth-guides' | 'disease-library' | 'messages' | 'scraping-center';
 
-export const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onExit?: () => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
   const {
     getAdminStats, getAllUsers, deleteUser, updateUserByAdmin,
     getAllPostsAdmin, deleteAnyPost, user,
@@ -1028,7 +1032,19 @@ export const AdminDashboard: React.FC = () => {
         />
       )}
 
-      <PageHeader title="Admin Dashboard" subtitle="Enterprise oversight, user management, and platform health." imageUrl="/images/scene-dashboard.svg" />
+      <div className="relative">
+        <PageHeader title="Admin Dashboard" subtitle="Enterprise oversight, user management, and platform health." imageUrl="/images/scene-dashboard.svg" />
+        {onExit ? (
+          <button
+            type="button"
+            onClick={onExit}
+            className="absolute right-4 top-4 z-10 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/90 px-4 py-2 text-sm font-bold text-[var(--ag-text)] shadow-lg backdrop-blur transition hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-black/35 dark:text-white"
+          >
+            <Home size={16} aria-hidden="true" />
+            <span>{language === 'ar' ? 'الرجوع للموقع' : 'Back to site'}</span>
+          </button>
+        ) : null}
+      </div>
 
       <div className="admin-panel-frame mx-auto mt-6 max-w-6xl px-4 space-y-6">
         <SectionHeading

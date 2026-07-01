@@ -1,26 +1,28 @@
 const cheerio = require('cheerio');
 
 const ARABIC_MONTHS = {
-  يناير: 1,
-  فبراير: 2,
-  مارس: 3,
-  أبريل: 4,
-  ابريل: 4,
-  مايو: 5,
-  يونيو: 6,
-  يوليو: 7,
-  أغسطس: 8,
-  اغسطس: 8,
-  سبتمبر: 9,
-  أكتوبر: 10,
-  اكتوبر: 10,
-  نوفمبر: 11,
-  ديسمبر: 12,
+  '\u064a\u0646\u0627\u064a\u0631': 1,
+  '\u0641\u0628\u0631\u0627\u064a\u0631': 2,
+  '\u0645\u0627\u0631\u0633': 3,
+  '\u0623\u0628\u0631\u064a\u0644': 4,
+  '\u0627\u0628\u0631\u064a\u0644': 4,
+  '\u0645\u0627\u064a\u0648': 5,
+  '\u064a\u0648\u0646\u064a\u0648': 6,
+  '\u064a\u0648\u0644\u064a\u0648': 7,
+  '\u0623\u063a\u0633\u0637\u0633': 8,
+  '\u0627\u063a\u0633\u0637\u0633': 8,
+  '\u0633\u0628\u062a\u0645\u0628\u0631': 9,
+  '\u0623\u0643\u062a\u0648\u0628\u0631': 10,
+  '\u0627\u0643\u062a\u0648\u0628\u0631': 10,
+  '\u0646\u0648\u0641\u0645\u0628\u0631': 11,
+  '\u062f\u064a\u0633\u0645\u0628\u0631': 12,
 };
 
 const BOILERPLATE_PATTERN =
-  /جميع الحقوق محفوظة|رئيس التحرير|للاشتراكات|اتصل بنا|تابعنا على|كلمات البحث|مواضيع متعلقة|أخبار الساعة|تعليق قيد المراجعة|اقرأ أيضا|اقرأ المزيد|شارك/i;
-const AUTHOR_PATTERN = /^(?:كتب|كتبت|بقلم|إعداد|اعداد|تصوير)\s*[:：]?\s*/i;
+  /\u062c\u0645\u064a\u0639 \u0627\u0644\u062d\u0642\u0648\u0642 \u0645\u062d\u0641\u0648\u0638\u0629|\u0631\u0626\u064a\u0633 \u0627\u0644\u062a\u062d\u0631\u064a\u0631|\u0644\u0644\u0627\u0634\u062a\u0631\u0627\u0643\u0627\u062a|\u0627\u062a\u0635\u0644 \u0628\u0646\u0627|\u062a\u0627\u0628\u0639\u0646\u0627 \u0639\u0644\u0649|\u0643\u0644\u0645\u0627\u062a \u0627\u0644\u0628\u062d\u062b|\u0645\u0648\u0627\u0636\u064a\u0639 \u0645\u062a\u0639\u0644\u0642\u0629|\u0623\u062e\u0628\u0627\u0631 \u0627\u0644\u0633\u0627\u0639\u0629|\u062a\u0639\u0644\u064a\u0642 \u0642\u064a\u062f \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629|\u0627\u0642\u0631\u0623 \u0623\u064a\u0636\u0627|\u0627\u0642\u0631\u0623 \u0627\u0644\u0645\u0632\u064a\u062f|\u0634\u0627\u0631\u0643|related|comments?|advert/i;
+const AUTHOR_PATTERN =
+  /^(?:\u0643\u062a\u0628|\u0643\u062a\u0628\u062a|\u0628\u0642\u0644\u0645|\u0625\u0639\u062f\u0627\u062f|\u0627\u0639\u062f\u0627\u062f|\u062a\u0635\u0648\u064a\u0631|by)\s*[:\uff1a]?\s*/i;
+
 const GENERIC_BODY_SELECTORS = [
   '[itemprop="articleBody"]',
   '.article-body',
@@ -44,6 +46,42 @@ const GENERIC_BODY_SELECTORS = [
   'article',
 ];
 
+const NON_CONTENT_SELECTORS = [
+  'script',
+  'style',
+  'noscript',
+  'iframe',
+  'form',
+  'nav',
+  'aside',
+  'header',
+  'footer',
+  '.comment',
+  '.comments',
+  '.sidebar',
+  '.side-bar',
+  '.related',
+  '.related-posts',
+  '.share',
+  '.sharing',
+  '.social',
+  '.ads',
+  '.ad',
+  '.advertisement',
+  '.breadcrumb',
+  '.pagination',
+  '.tags',
+  '.read-more',
+  '.most-read',
+  '.also-read',
+  '[class*="advert"]',
+  '[id*="advert"]',
+  '[class*="sidebar"]',
+  '[id*="sidebar"]',
+  '[class*="related"]',
+  '[id*="related"]',
+].join(',');
+
 const normalizeWhitespace = (text = '') =>
   String(text || '')
     .replace(/\r/g, '')
@@ -60,11 +98,11 @@ const paragraphText = (text = '') =>
 const summarize = (text = '', maxLength = 280) => {
   const cleanedText = paragraphText(text);
   if (cleanedText.length <= maxLength) return cleanedText;
-  return `${cleanedText.slice(0, maxLength - 1).trim()}…`;
+  return `${cleanedText.slice(0, maxLength - 1).trim()}...`;
 };
 
 const absoluteUrl = (url, baseUrl) => {
-  if (!url) return null;
+  if (!url || /^data:/i.test(String(url))) return null;
   try {
     return new URL(url, baseUrl).toString();
   } catch {
@@ -72,22 +110,23 @@ const absoluteUrl = (url, baseUrl) => {
   }
 };
 
-const firstSrcFromSrcset = (srcset = '') =>
+const srcsetUrls = (srcset = '') =>
   String(srcset || '')
     .split(',')
     .map((entry) => entry.trim().split(/\s+/)[0])
-    .find(Boolean) || null;
+    .filter(Boolean);
 
-const imageAttribute = ($image) =>
-  $image.attr('data-src') ||
-  $image.attr('data-original') ||
-  $image.attr('data-lazy-src') ||
-  $image.attr('data-lazy') ||
-  $image.attr('data-image') ||
-  $image.attr('data-img') ||
-  firstSrcFromSrcset($image.attr('data-srcset') || $image.attr('srcset')) ||
-  $image.attr('src') ||
-  null;
+const imageAttributes = ($image) => [
+  $image.attr('data-src'),
+  $image.attr('data-original'),
+  $image.attr('data-lazy-src'),
+  $image.attr('data-lazy'),
+  $image.attr('data-image'),
+  $image.attr('data-img'),
+  $image.attr('src'),
+  ...srcsetUrls($image.attr('data-srcset')),
+  ...srcsetUrls($image.attr('srcset')),
+].filter(Boolean);
 
 const metaContent = ($, names) => {
   for (const name of names) {
@@ -100,7 +139,6 @@ const metaContent = ($, names) => {
 const flattenJsonLd = (structuredEntry) => {
   if (Array.isArray(structuredEntry)) return structuredEntry.flatMap(flattenJsonLd);
   if (!structuredEntry || typeof structuredEntry !== 'object') return [];
-
   const graphEntries = Array.isArray(structuredEntry['@graph'])
     ? structuredEntry['@graph'].flatMap(flattenJsonLd)
     : [];
@@ -115,7 +153,7 @@ const jsonLdEntries = ($) => {
     try {
       entries.push(...flattenJsonLd(JSON.parse(rawJson)));
     } catch {
-      // Some publishers emit malformed optional structured data; the DOM remains usable.
+      // Optional structured data can be malformed; the DOM parser remains the source of truth.
     }
   });
   return entries;
@@ -128,9 +166,45 @@ const articleEntry = (entries) =>
     return types.some((type) => /article|newsarticle/i.test(String(type || '')));
   }) || null;
 
+const cleanAuthorName = (value) => {
+  const text = paragraphText(value).replace(AUTHOR_PATTERN, '').trim();
+  if (!text || text.length > 100 || BOILERPLATE_PATTERN.test(text)) return null;
+  return text;
+};
+
+const structuredAuthor = (structuredArticle) => {
+  const author = structuredArticle?.author;
+  if (!author) return null;
+  const authorValue = Array.isArray(author) ? author[0] : author;
+  if (typeof authorValue === 'string') return cleanAuthorName(authorValue);
+  return cleanAuthorName(authorValue?.name);
+};
+
+const articleAuthor = ($, structuredArticle) => {
+  const metadataAuthor = metaContent($, [
+    'author',
+    'article:author',
+    'parsely-author',
+    'sailthru.author',
+    'byl',
+  ]);
+  const selectorAuthor = [
+    '[rel="author"]',
+    '[itemprop="author"]',
+    '.author',
+    '.writer',
+    '.byline',
+    '.article-author',
+    '.news-author',
+  ]
+    .map((selector) => cleanAuthorName($(selector).first().text()))
+    .find(Boolean);
+  return cleanAuthorName(metadataAuthor) || structuredAuthor(structuredArticle) || selectorAuthor;
+};
+
 const usableParagraphs = ($, container) => {
   const paragraphs = [];
-  container.find('script, style, noscript, iframe, form, .comment, .comments').remove();
+  container.find(NON_CONTENT_SELECTORS).remove();
 
   container.find('p, li, h2, h3, blockquote').each((_index, textElement) => {
     const text = paragraphText($(textElement).text());
@@ -140,7 +214,7 @@ const usableParagraphs = ($, container) => {
 
   if (paragraphs.length > 0) return paragraphs;
   const fallbackText = paragraphText(container.text());
-  return fallbackText.length >= 80 ? [fallbackText] : [];
+  return fallbackText.length >= 80 && !BOILERPLATE_PATTERN.test(fallbackText) ? [fallbackText] : [];
 };
 
 const selectorBodyCandidates = ($, selectors) => {
@@ -149,7 +223,7 @@ const selectorBodyCandidates = ($, selectors) => {
     $(selector).each((_index, bodyElement) => {
       const paragraphs = usableParagraphs($, $(bodyElement).clone());
       const content = paragraphs.join('\n\n');
-      if (content.length >= 80) candidates.push({ content, paragraphs });
+      if (content.length >= 80) candidates.push({ content, paragraphs, element: $(bodyElement) });
     });
   }
   return candidates;
@@ -162,7 +236,7 @@ const jsonLdBodyCandidate = (structuredArticle) => {
   const paragraphs = normalizeWhitespace(articleBody)
     .split(/\n{2,}/)
     .map(paragraphText)
-    .filter((text) => text.length >= 20);
+    .filter((text) => text.length >= 20 && !BOILERPLATE_PATTERN.test(text) && !AUTHOR_PATTERN.test(text));
   const content = paragraphs.join('\n\n');
   return content.length >= 80 ? { content, paragraphs } : null;
 };
@@ -172,7 +246,6 @@ const longestBodyCandidate = ($, source, structuredArticle) => {
   const candidates = selectorBodyCandidates($, selectors);
   const structuredCandidate = jsonLdBodyCandidate(structuredArticle);
   if (structuredCandidate) candidates.push(structuredCandidate);
-
   return candidates.sort((left, right) => right.content.length - left.content.length)[0] || null;
 };
 
@@ -183,7 +256,7 @@ const articleTitle = ($, structuredArticle) =>
     $('h1').first().text() ||
     $('title').first().text()
   )
-    .replace(/\s*[-|]\s*(?:بوابة الأهرام الزراعي|الأهرام الزراعي|عالم الزراعة|أخبار اليوم)\s*$/i, '')
+    .replace(/\s*[-|]\s*(?:\u0628\u0648\u0627\u0628\u0629 \u0627\u0644\u0623\u0647\u0631\u0627\u0645 \u0627\u0644\u0632\u0631\u0627\u0639\u064a|\u0627\u0644\u0623\u0647\u0631\u0627\u0645 \u0627\u0644\u0632\u0631\u0627\u0639\u064a|\u0639\u0627\u0644\u0645 \u0627\u0644\u0632\u0631\u0627\u0639\u0629|\u0623\u062e\u0628\u0627\u0631 \u0627\u0644\u064a\u0648\u0645)\s*$/i, '')
     .trim() || null;
 
 const articleSummary = ($, structuredArticle, bodyCandidate, title) => {
@@ -195,23 +268,57 @@ const articleSummary = ($, structuredArticle, bodyCandidate, title) => {
   return summarize(summarySource, 260);
 };
 
-const structuredImageUrl = (structuredArticle) => {
+const structuredImageUrls = (structuredArticle) => {
   const image = structuredArticle?.image;
-  if (typeof image === 'string') return image;
-  if (Array.isArray(image)) return structuredImageUrl({ image: image[0] });
-  return image?.url || image?.contentUrl || null;
+  if (!image) return [];
+  if (typeof image === 'string') return [image];
+  if (Array.isArray(image)) return image.flatMap((entry) => structuredImageUrls({ image: entry }));
+  return [image.url, image.contentUrl].filter(Boolean);
 };
 
-const articleImage = ($, source, structuredArticle, articleUrl) => {
-  const metadataImage = metaContent($, ['og:image', 'twitter:image']);
-  const selectorImage = (source.imageSelectors || [])
-    .map((selector) => imageAttribute($(selector).first()))
-    .find(Boolean);
-  const bodyImage = imageAttribute($('[itemprop="articleBody"] img, article img, .news-details img, .details img, .articlebody img').first());
-  return absoluteUrl(
-    metadataImage || structuredImageUrl(structuredArticle) || selectorImage || bodyImage,
-    articleUrl
-  );
+const imageQualityScore = (url) => {
+  const lower = String(url || '').toLowerCase();
+  if (/logo|icon|avatar|sprite|placeholder|default|loading|blank/.test(lower)) return -1000;
+  const dimensions = [...lower.matchAll(/(?:w|width|h|height)[=_-](\d{2,5})/g)].map((match) => Number(match[1]));
+  const filenameDimensions = lower.match(/(\d{3,5})[x_-](\d{3,5})/);
+  const sizeScore = dimensions.reduce((total, value) => total + value, 0)
+    + (filenameDimensions ? Number(filenameDimensions[1]) + Number(filenameDimensions[2]) : 0);
+  return sizeScore + (/\.(jpe?g|png|webp)(?:[?#].*)?$/i.test(lower) ? 100 : 0);
+};
+
+const collectImageUrls = ($, source, structuredArticle, articleUrl, bodyCandidate) => {
+  const urls = [
+    metaContent($, ['og:image:secure_url', 'og:image', 'twitter:image']),
+    ...structuredImageUrls(structuredArticle),
+  ];
+
+  const imageSelectors = [
+    ...(source.imageSelectors || []),
+    '[itemprop="articleBody"] img',
+    'article img',
+    '.news-details img',
+    '.details img',
+    '.articlebody img',
+    '.articleBody img',
+    '.brief img',
+  ];
+
+  for (const selector of imageSelectors) {
+    $(selector).each((_index, imageElement) => {
+      urls.push(...imageAttributes($(imageElement)));
+    });
+  }
+
+  bodyCandidate?.element?.find('img').each((_index, imageElement) => {
+    urls.push(...imageAttributes($(imageElement)));
+  });
+
+  return [...new Set(
+    urls
+      .map((url) => absoluteUrl(url, articleUrl))
+      .filter(Boolean)
+      .filter((url) => imageQualityScore(url) > -1000)
+  )].sort((left, right) => imageQualityScore(right) - imageQualityScore(left));
 };
 
 const normalizeDigits = (value = '') =>
@@ -228,7 +335,7 @@ const parsedDate = (dateValue) => {
 const arabicDate = (pageText) => {
   const normalizedText = normalizeDigits(pageText);
   const match = normalizedText.match(
-    /(\d{1,2})\s+([ء-يA-Za-z]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*([صمAPMapm.]+)?)?/
+    /(\d{1,2})\s+([\u0621-\u064aA-Za-z]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*([\u0635\u0645APMapm.]+)?)?/
   );
   if (!match) return null;
 
@@ -238,8 +345,8 @@ const arabicDate = (pageText) => {
 
   let hour = Number(hourText);
   const meridiem = meridiemText.toLowerCase();
-  if ((meridiem.includes('م') || meridiem.includes('pm')) && hour < 12) hour += 12;
-  if ((meridiem.includes('ص') || meridiem.includes('am')) && hour === 12) hour = 0;
+  if ((meridiem.includes('\u0645') || meridiem.includes('pm')) && hour < 12) hour += 12;
+  if ((meridiem.includes('\u0635') || meridiem.includes('am')) && hour === 12) hour = 0;
   return new Date(Date.UTC(Number(year), month - 1, Number(day), hour, Number(minuteText))).toISOString();
 };
 
@@ -262,7 +369,8 @@ const articlePublishedAt = ($, structuredArticle) => {
 const articleCategory = ($, source) =>
   paragraphText(
     metaContent($, ['article:section', 'section']) ||
-    $('[itemprop="articleSection"]').first().text()
+    $('[itemprop="articleSection"]').first().text() ||
+    $('.breadcrumb a, .breadcrumbs a').last().text()
   ).toLowerCase() || source.defaultCategory;
 
 const sourceArticleId = (articleUrl) => {
@@ -283,15 +391,19 @@ const parseNewsArticle = (html, source, articleUrl) => {
   const title = articleTitle($, structuredArticle);
   if (!title) return null;
 
+  const authorName = articleAuthor($, structuredArticle);
   const bodyCandidate = longestBodyCandidate($, source, structuredArticle);
   const summary = articleSummary($, structuredArticle, bodyCandidate, title);
   const content = bodyCandidate?.content || summary;
+  const imageUrls = collectImageUrls($, source, structuredArticle, articleUrl, bodyCandidate);
 
   return {
     title,
     summary,
     content,
-    imageUrl: articleImage($, source, structuredArticle, articleUrl),
+    imageUrl: imageUrls[0] || null,
+    imageUrls,
+    authorName,
     category: articleCategory($, source),
     publishedAt: articlePublishedAt($, structuredArticle),
     source: source.name,

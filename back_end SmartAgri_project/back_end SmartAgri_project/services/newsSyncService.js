@@ -1,5 +1,6 @@
 const pool = require('../config/database');
 const { load } = require('cheerio');
+const crypto = require('crypto');
 const { parseNewsArticle } = require('./newsArticleParser');
 
 const NEWS_SOURCES = [
@@ -41,33 +42,10 @@ const NEWS_SOURCES = [
     ],
     defaultCategory: 'agri',
   },
-  {
-    name: 'Akhbar Elyom',
-    homepage: 'https://akhbarelyom.com/News/Search/1/1?JournalID=1&query=%D8%A7%D9%84%D8%B2%D8%B1%D8%A7%D8%B9%D8%A9',
-    baseUrl: 'https://akhbarelyom.com/',
-    articlePatterns: [/\/news\/newdetails\/\d+\/\d+\//i, /\/news\/newsdetails\/\d+\/\d+\//i],
-    bodySelectors: [
-      '.articlebody',
-      '.articleBody',
-      '.article-body',
-      '.news-details',
-      '.details',
-      '.entry-content',
-      'article',
-    ],
-    imageSelectors: [
-      '.article-image img',
-      '.newsImage img',
-      '.details img',
-      '.articlebody img',
-      'article img',
-    ],
-    defaultCategory: 'agri',
-  },
 ];
 
 const SYNC_ENABLED = (process.env.NEWS_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
-const SYNC_INTERVAL_MINUTES = Math.max(5, parseInt(process.env.NEWS_SYNC_INTERVAL_MINUTES || '60', 10) || 60);
+const SYNC_INTERVAL_MINUTES = Math.max(5, parseInt(process.env.NEWS_SYNC_INTERVAL_MINUTES || '15', 10) || 15);
 const STARTUP_DELAY_MS = Math.max(1000, parseInt(process.env.NEWS_SYNC_STARTUP_DELAY_MS || '5000', 10) || 5000);
 const FETCH_HEADERS = {
   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -122,6 +100,18 @@ const extractArticleDetails = async (source, articleUrl) => {
 };
 
 const textFromHtml = (html = '') => load(`<div>${html}</div>`)('div').text().replace(/\s+/g, ' ').trim();
+
+const normalizeTitleForHash = (title = '') =>
+  textFromHtml(title)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+const titleHash = (title = '') => {
+  const normalizedTitle = normalizeTitleForHash(title);
+  if (!normalizedTitle) return null;
+  return crypto.createHash('sha256').update(normalizedTitle).digest('hex');
+};
 
 const findPreviewContainer = ($, anchor) => {
   const candidates = [
@@ -236,11 +226,14 @@ const fallbackArticleFromPreview = (source, preview) => ({
   summary: preview.summary || preview.title,
   content: preview.summary || preview.title,
   imageUrl: preview.imageUrl,
+  imageUrls: preview.imageUrl ? [preview.imageUrl] : [],
+  authorName: null,
   category: source.defaultCategory,
   publishedAt: preview.publishedAt || new Date().toISOString(),
   source: source.name,
   sourceUrl: preview.url,
   sourceArticleId: extractSourceArticleId(preview.url),
+  titleHash: titleHash(preview.title),
 });
 
 const mergeArticleWithPreview = (article, source, preview) => {
@@ -251,26 +244,52 @@ const mergeArticleWithPreview = (article, source, preview) => {
     summary: article.summary || preview.summary || article.title || preview.title,
     content: article.content || preview.summary || article.summary || preview.title,
     imageUrl: article.imageUrl || preview.imageUrl,
+    imageUrls: article.imageUrls?.length ? article.imageUrls : (article.imageUrl || preview.imageUrl ? [article.imageUrl || preview.imageUrl] : []),
+    authorName: article.authorName || null,
     publishedAt: article.publishedAt || preview.publishedAt || new Date().toISOString(),
+    titleHash: titleHash(article.title || preview.title),
   };
 };
 
+const articleExists = async (articleOrPreview) => {
+  const hash = articleOrPreview.titleHash || titleHash(articleOrPreview.title);
+  const result = await pool.query(
+    `SELECT id FROM news
+     WHERE deleted_at IS NULL
+       AND (
+         source_url = $1
+         OR ($2::text IS NOT NULL AND title_hash = $2)
+       )
+     LIMIT 1`,
+    [articleOrPreview.sourceUrl || articleOrPreview.url, hash]
+  );
+  return result.rows.length > 0;
+};
+
 const upsertImportedArticle = async (article) => {
+  const imagesJson = JSON.stringify(article.imageUrls || []);
+  const hash = article.titleHash || titleHash(article.title);
   const existing = await pool.query(
-    'SELECT id FROM news WHERE source_url = $1',
-    [article.sourceUrl]
+    `SELECT id FROM news
+     WHERE source_url = $1 OR ($2::text IS NOT NULL AND title_hash = $2)
+     LIMIT 1`,
+    [article.sourceUrl, hash]
   );
 
   if (existing.rows.length === 0) {
     await pool.query(
       `INSERT INTO news
-         (title, summary, content, image_url, category, published_at, source_name, source_url, source_article_id, is_imported)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)`,
+         (title, summary, content, image_url, author_name, images_json, title_hash,
+          category, published_at, source_name, source_url, source_article_id, is_imported)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, TRUE)`,
       [
         article.title,
         article.summary,
         article.content,
         article.imageUrl,
+        article.authorName,
+        imagesJson,
+        hash,
         article.category,
         article.publishedAt,
         article.source,
@@ -287,23 +306,31 @@ const upsertImportedArticle = async (article) => {
        summary = $2,
        content = $3,
        image_url = COALESCE($4, image_url),
-       category = COALESCE($5, category),
-       published_at = COALESCE($6, published_at),
-       source_name = $7,
-       source_article_id = COALESCE($8, source_article_id),
+       author_name = COALESCE($5, author_name),
+       images_json = COALESCE($6::jsonb, images_json),
+       title_hash = COALESCE($7, title_hash),
+       category = COALESCE($8, category),
+       published_at = COALESCE($9, published_at),
+       source_name = $10,
+       source_url = COALESCE($11, source_url),
+       source_article_id = COALESCE($12, source_article_id),
        is_imported = TRUE,
        updated_at = NOW()
-     WHERE source_url = $9`,
+     WHERE id = $13`,
     [
       article.title,
       article.summary,
       article.content,
       article.imageUrl,
+      article.authorName,
+      imagesJson,
+      hash,
       article.category,
       article.publishedAt,
       article.source,
-      article.sourceArticleId,
       article.sourceUrl,
+      article.sourceArticleId,
+      existing.rows[0].id,
     ]
   );
 
@@ -317,9 +344,16 @@ const syncSource = async (source) => {
   let created = 0;
   let updated = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (const preview of articlePreviews) {
     try {
+      preview.titleHash = titleHash(preview.title);
+      if (await articleExists(preview)) {
+        skipped += 1;
+        continue;
+      }
+
       const parsedArticle = await extractArticleDetails(source, preview.url);
       const article = mergeArticleWithPreview(parsedArticle, source, preview);
       if (!article?.title || !article?.summary) continue;
@@ -341,11 +375,12 @@ const syncSource = async (source) => {
   }
 
   return {
-    source: source.name,
-    scanned: articlePreviews.length,
-    created,
-    updated,
-    failed,
+      source: source.name,
+      scanned: articlePreviews.length,
+      created,
+      updated,
+      skipped,
+      failed,
   };
 };
 
@@ -372,6 +407,7 @@ const syncImportedNews = async () => {
     let created = 0;
     let updated = 0;
     let failed = 0;
+    let skipped = 0;
     let scanned = 0;
 
     for (const source of NEWS_SOURCES) {
@@ -381,6 +417,7 @@ const syncImportedNews = async () => {
         created += result.created;
         updated += result.updated;
         failed += result.failed;
+        skipped += result.skipped || 0;
         scanned += result.scanned;
       } catch (error) {
         perSource.push({
@@ -388,6 +425,7 @@ const syncImportedNews = async () => {
           scanned: 0,
           created: 0,
           updated: 0,
+          skipped: 0,
           failed: 1,
           error: error.message || 'Unknown sync error',
         });
@@ -400,6 +438,7 @@ const syncImportedNews = async () => {
       scanned,
       created,
       updated,
+      skipped,
       failed,
       perSource,
       syncedAt: new Date().toISOString(),

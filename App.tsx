@@ -205,7 +205,7 @@ const App: React.FC = () => {
   // not on every App state update (scrolled, dropdown open, etc.).
   const activeViewContent = useMemo(() => {
     if (activeView === 'admin' && user?.role === 'admin') {
-      return <AdminDashboard />;
+      return <AdminDashboard onExit={() => openTopLevelView('home')} />;
     }
 
     switch (activeView) {
@@ -234,7 +234,7 @@ const App: React.FC = () => {
       default:
         return <HomePage setActiveView={setActiveView} onOpenChat={handleOpenChat} onOpenVoice={handleOpenVoice} onOpenSignup={handleOpenSignup} />;
     }
-  }, [activeView, user?.role, isLoggedIn, requestedDashboardView, handleOpenChat, handleOpenVoice, handleOpenSignup, handleOpenLogin, handleTrackPlantSuccess, handleRequestedViewHandled]);
+  }, [activeView, user?.role, isLoggedIn, requestedDashboardView, handleOpenChat, handleOpenVoice, handleOpenSignup, handleOpenLogin, handleTrackPlantSuccess, handleRequestedViewHandled, openTopLevelView]);
 
   const handleLogin = useCallback(async (
     name: string,
@@ -322,10 +322,6 @@ const App: React.FC = () => {
       onClick: () => openDashboardView('myFarms'),
     },
   ];
-
-  if (user?.role === 'admin') {
-    return <AdminDashboard />;
-  }
 
   const appNavItems: Array<{ view: View; label: string; icon: React.ReactNode }> = [
     { view: 'home', label: t('app.buttons.home'), icon: <Home size={17} /> },
@@ -596,6 +592,17 @@ const App: React.FC = () => {
                       <LayoutDashboard size={16} aria-hidden="true" />
                       <span>{t('homePage.landing.header.dashboard')}</span>
                     </button>
+                    {user.role === 'admin' ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setActiveView('admin'); setIsProfileDropdownOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className="app-profile-menu-item"
+                      >
+                        <Settings size={16} aria-hidden="true" />
+                        <span>{language === 'ar' ? 'لوحة الأدمن' : 'Admin Panel'}</span>
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       role="menuitem"
@@ -724,6 +731,12 @@ const App: React.FC = () => {
                       <span>{t('homePage.landing.header.dashboard')}</span>
                       <LayoutDashboard size={18} aria-hidden="true" />
                     </button>
+                    {user.role === 'admin' ? (
+                      <button type="button" className="app-mobile-link" onClick={() => runHeaderAction(() => setActiveView('admin'))}>
+                        <span>{language === 'ar' ? 'لوحة الأدمن' : 'Admin Panel'}</span>
+                        <Settings size={18} aria-hidden="true" />
+                      </button>
+                    ) : null}
                     <button type="button" className="app-mobile-link" onClick={() => runHeaderAction(() => setIsProfileModalOpen(true))}>
                       <span>{t('homePage.landing.header.profile')}</span>
                       <UserRound size={18} aria-hidden="true" />

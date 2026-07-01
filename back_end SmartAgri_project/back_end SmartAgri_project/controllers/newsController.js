@@ -1,6 +1,17 @@
 const pool = require('../config/database');
 const { syncImportedNews } = require('../services/newsSyncService');
 
+const parseImages = (value) => {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 // ─── Helper: map DB row → API object ─────────────────────────
 const mapRow = (row) => ({
   id:          row.id,
@@ -8,6 +19,9 @@ const mapRow = (row) => ({
   summary:     row.summary,
   content:     row.content || undefined,
   imageUrl:    row.image_url  || null,
+  imageUrls:   parseImages(row.images_json),
+  images:      parseImages(row.images_json),
+  authorName:  row.author_name || undefined,
   category:    row.category   || 'general',
   publishedAt: row.published_at,
   createdAt:   row.created_at,
@@ -34,14 +48,14 @@ let lastStaleCheckAt = 0;
 
 const NEWS_LAZY_SYNC_MAX_AGE_MINUTES = Math.max(
   5,
-  parseInt(process.env.NEWS_LAZY_SYNC_MAX_AGE_MINUTES || process.env.NEWS_SYNC_INTERVAL_MINUTES || '60', 10) || 60
+  parseInt(process.env.NEWS_LAZY_SYNC_MAX_AGE_MINUTES || process.env.NEWS_SYNC_INTERVAL_MINUTES || '15', 10) || 15
 );
 const NEWS_STALE_CHECK_INTERVAL_MS = 60 * 1000;
 const NEWS_SYNC_ENABLED = (process.env.NEWS_SYNC_ENABLED || 'true').toLowerCase() !== 'false';
 
 const runNewsQuery = async ({ whereClause, params, limit, offset }) => {
   const result = await pool.query(
-    `SELECT id, title, summary, image_url, category, published_at, created_at, updated_at,
+    `SELECT id, title, summary, image_url, author_name, images_json, category, published_at, created_at, updated_at,
             source_name, source_url, source_article_id, is_imported
      FROM news
      ${whereClause}
